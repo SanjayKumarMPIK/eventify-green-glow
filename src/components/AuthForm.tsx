@@ -8,7 +8,8 @@ import { UserRole } from "@/types";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ADMIN_CODE, validateEmail, USERS } from "@/lib/data";
+import { validateEmail, ADMIN_CODE } from "@/lib/data";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AuthFormProps {
   type: "login" | "register";
@@ -22,58 +23,69 @@ export function AuthForm({ type }: AuthFormProps) {
   const [name, setName] = useState("");
   const [department, setDepartment] = useState("");
   const [adminCode, setAdminCode] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
 
-    // Validate email format
-    if (!validateEmail(email)) {
-      toast.error("Invalid email format. It should be like: name.123456@dept.ritchennai.edu.in");
-      return;
-    }
-
-    // Validate admin code if role is admin
-    if (role === "admin" && adminCode !== ADMIN_CODE) {
-      toast.error("Invalid admin code. The correct code is ADMIN123");
-      return;
-    }
-
-    if (type === "login") {
-      // Check if user exists in mock data
-      const user = USERS.find(u => u.email === email);
-      if (!user) {
-        toast.error("User not found. Please register first.");
+    try {
+      // Validate email format
+      if (!validateEmail(email)) {
+        toast.error("Invalid email format. It should be like: name.123456@dept.ritchennai.edu.in");
+        setLoading(false);
         return;
       }
 
-      // In a real app, you would validate the password here
-      
-      // Store user in localStorage
-      localStorage.setItem("currentUser", JSON.stringify(user));
-      toast.success(`Logged in successfully as ${role}`);
-      navigate("/dashboard");
-    } else {
-      // Registration
-      // Create a new user
-      const newUser = {
-        id: (Date.now()).toString(),
-        email,
-        name,
-        role,
-        department: role === "student" ? department : undefined
-      };
+      // Validate admin code if role is admin
+      if (role === "admin" && adminCode !== ADMIN_CODE) {
+        toast.error("Invalid admin code");
+        setLoading(false);
+        return;
+      }
 
-      // In a real app, you would store this in a database
-      // For now, we'll just use localStorage
-      const existingUsers = JSON.parse(localStorage.getItem("users") || JSON.stringify(USERS));
-      existingUsers.push(newUser);
-      localStorage.setItem("users", JSON.stringify(existingUsers));
-      
-      // Log in the new user automatically
-      localStorage.setItem("currentUser", JSON.stringify(newUser));
-      
-      toast.success(`Registered successfully as ${role}`);
-      navigate("/dashboard");
+      if (type === "login") {
+        // Sign in with Supabase
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) {
+          toast.error(error.message);
+          setLoading(false);
+          return;
+        }
+
+        toast.success("Logged in successfully");
+        navigate("/dashboard");
+      } else {
+        // Register with Supabase
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              name,
+              role,
+              department: role === "student" ? department : undefined
+            },
+            emailRedirectTo: `${window.location.origin}/dashboard`
+          }
+        });
+
+        if (error) {
+          toast.error(error.message);
+          setLoading(false);
+          return;
+        }
+
+        toast.success("Registration successful! Please check your email for verification.");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "An error occurred");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -177,17 +189,12 @@ export function AuthForm({ type }: AuthFormProps) {
                     onChange={(e) => setAdminCode(e.target.value)}
                     required 
                   />
-                  {type === "login" && (
-                    <p className="text-xs text-muted-foreground">
-                      Hint: The admin code is ADMIN123
-                    </p>
-                  )}
                 </div>
               )}
             </div>
 
-            <Button className="w-full mt-6" type="submit">
-              {type === "login" ? "Login" : "Register"}
+            <Button className="w-full mt-6" type="submit" disabled={loading}>
+              {loading ? "Processing..." : type === "login" ? "Login" : "Register"}
             </Button>
           </form>
         </CardContent>

@@ -6,35 +6,58 @@ import { USERS } from "@/lib/data";
 import { User, UserRole } from "@/types";
 import { StudentDashboard } from "@/components/StudentDashboard";
 import { AdminDashboard } from "@/components/AdminDashboard";
+import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
+  const [userRole, setUserRole] = useState<UserRole>("student");
+  const { signOut } = useAuth();
   
   useEffect(() => {
-    // In a real app, this would come from authentication context/state
-    const storedUser = localStorage.getItem("currentUser");
-    if (!storedUser) {
-      navigate("/login");
-      return;
-    }
+    const fetchUserProfile = async () => {
+      const { data: authUser } = await supabase.auth.getUser();
+      
+      if (!authUser.user) {
+        navigate("/login");
+        return;
+      }
+      
+      // Fetch user profile from profiles table
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.user.id)
+        .single();
+      
+      if (error || !profile) {
+        console.error("Error fetching profile:", error);
+        return;
+      }
+      
+      // Create a user object compatible with our app
+      const appUser: User = {
+        id: authUser.user.id,
+        email: authUser.user.email || '',
+        name: profile.name,
+        role: profile.role as UserRole,
+        department: profile.department
+      };
+      
+      setUser(appUser);
+      setUserRole(profile.role as UserRole);
+    };
     
-    try {
-      const parsedUser = JSON.parse(storedUser);
-      setUser(parsedUser);
-    } catch (e) {
-      localStorage.removeItem("currentUser");
-      navigate("/login");
-    }
+    fetchUserProfile();
   }, [navigate]);
   
-  const handleLogout = () => {
-    localStorage.removeItem("currentUser");
-    navigate("/");
+  const handleLogout = async () => {
+    await signOut();
   };
 
   if (!user) {
-    return null; // Loading state or redirect handled by useEffect
+    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
   }
 
   return (
@@ -67,16 +90,16 @@ const Dashboard = () => {
       <main className="flex-1 container py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold tracking-tight">
-            {user.role === "admin" ? "Admin Dashboard" : "Student Dashboard"}
+            {userRole === "admin" ? "Admin Dashboard" : "Student Dashboard"}
           </h1>
           <p className="text-muted-foreground mt-1">
-            {user.role === "admin" 
+            {userRole === "admin" 
               ? "Manage events and view registrations" 
               : "View your registered events and certificates"}
           </p>
         </div>
 
-        {user.role === "admin" ? (
+        {userRole === "admin" ? (
           <AdminDashboard />
         ) : (
           <StudentDashboard />
