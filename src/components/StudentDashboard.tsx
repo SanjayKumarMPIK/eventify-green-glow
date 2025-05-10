@@ -24,19 +24,41 @@ export function StudentDashboard() {
       
       // Get registrations for current user
       const allRegistrations = JSON.parse(localStorage.getItem("userRegistrations") || "[]");
-      const userRegistrations = allRegistrations.filter((reg: Registration) => 
+      
+      // Convert dates from strings to Date objects
+      const processedRegistrations = allRegistrations.map((reg: any) => ({
+        ...reg,
+        registrationDate: new Date(reg.registrationDate)
+      }));
+      
+      const userRegistrations = processedRegistrations.filter((reg: Registration) => 
         reg.userId === user.id
       );
       setMyRegistrations(userRegistrations);
       
-      // Get all events
+      // Get all events and convert dates
       const allEvents = JSON.parse(localStorage.getItem("events") || "[]");
-      setEvents(allEvents);
+      const processedEvents = allEvents.map((event: any) => ({
+        ...event,
+        date: new Date(event.date)
+      }));
+      setEvents(processedEvents);
     }
   }, []);
 
   const getEventById = (eventId: string): Event | undefined => {
     return events.find((e) => e.id === eventId);
+  };
+
+  const formatDate = (date: Date | string) => {
+    // Ensure we're working with a Date object
+    const dateObj = date instanceof Date ? date : new Date(date);
+    
+    return dateObj.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
   };
 
   const generateCertificate = (registration: Registration) => {
@@ -68,7 +90,7 @@ export function StudentDashboard() {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <p className="text-sm text-muted-foreground mb-2">
-                      Registered on {new Date(registration.registrationDate).toLocaleDateString()}
+                      Registered on {formatDate(registration.registrationDate)}
                     </p>
                     <div className="flex flex-col space-y-2">
                       <Button 
@@ -120,7 +142,9 @@ export function StudentDashboard() {
                   {getEventById(showCertificate.eventId)?.title}
                 </p>
                 <p className="text-lg mb-10">
-                  held on {getEventById(showCertificate.eventId)?.date.toLocaleDateString()}
+                  held on {getEventById(showCertificate.eventId)?.date instanceof Date 
+                    ? formatDate(getEventById(showCertificate.eventId)?.date as Date) 
+                    : formatDate(new Date(getEventById(showCertificate.eventId)?.date as string))}
                 </p>
                 <div className="flex justify-between pt-10">
                   <div>

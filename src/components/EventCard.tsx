@@ -23,8 +23,11 @@ export function EventCard({
   onViewRegistrations,
   onIncrementSlots,
 }: EventCardProps) {
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString("en-US", {
+  const formatDate = (date: Date | string) => {
+    // Ensure we're working with a Date object
+    const dateObj = date instanceof Date ? date : new Date(date);
+    
+    return dateObj.toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
       day: "numeric",

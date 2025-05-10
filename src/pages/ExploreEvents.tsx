@@ -133,7 +133,14 @@ const ExploreEvents = () => {
   }
 
   // Get events from localStorage or use the default ones
-  const events = JSON.parse(localStorage.getItem("events") || JSON.stringify(EVENTS));
+  const storedEvents = localStorage.getItem("events");
+  const rawEvents = storedEvents ? JSON.parse(storedEvents) : EVENTS;
+  
+  // Convert event dates from strings to Date objects
+  const events = rawEvents.map((event: any) => ({
+    ...event,
+    date: new Date(event.date)
+  }));
 
   return (
     <div className="flex flex-col min-h-screen">

@@ -15,14 +15,35 @@ import { EVENTS, REGISTRATIONS } from "./lib/data";
 
 const queryClient = new QueryClient();
 
+// Function to ensure dates are properly stringified before storage
+const prepareEventsForStorage = (events: any[]) => {
+  return events.map(event => ({
+    ...event,
+    date: event.date instanceof Date ? event.date.toISOString() : event.date,
+    registrations: event.registrations.map((reg: any) => ({
+      ...reg,
+      registrationDate: reg.registrationDate instanceof Date ? 
+        reg.registrationDate.toISOString() : reg.registrationDate
+    }))
+  }));
+};
+
+const prepareRegistrationsForStorage = (registrations: any[]) => {
+  return registrations.map(reg => ({
+    ...reg,
+    registrationDate: reg.registrationDate instanceof Date ? 
+      reg.registrationDate.toISOString() : reg.registrationDate
+  }));
+};
+
 const App = () => {
   // Initialize localStorage data
   useEffect(() => {
     if (!localStorage.getItem("events")) {
-      localStorage.setItem("events", JSON.stringify(EVENTS));
+      localStorage.setItem("events", JSON.stringify(prepareEventsForStorage(EVENTS)));
     }
     if (!localStorage.getItem("userRegistrations")) {
-      localStorage.setItem("userRegistrations", JSON.stringify(REGISTRATIONS));
+      localStorage.setItem("userRegistrations", JSON.stringify(prepareRegistrationsForStorage(REGISTRATIONS)));
     }
   }, []);
 

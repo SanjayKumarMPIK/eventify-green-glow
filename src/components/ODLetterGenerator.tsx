@@ -13,12 +13,23 @@ interface ODLetterGeneratorProps {
 export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProps) {
   const [isOpen, setIsOpen] = useState(false);
   
+  const formatDate = (date: Date | string) => {
+    // Ensure we're working with a Date object
+    const dateObj = date instanceof Date ? date : new Date(date);
+    
+    return dateObj.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+  };
+  
   const odLetterContent = `
       Date: ${new Date().toLocaleDateString()}
       
       To Whom It May Concern,
       
-      This is to certify that the following students from ${registration.teamMembers[0].department} department are participating in "${event.title}" event on ${new Date(event.date).toLocaleDateString()}.
+      This is to certify that the following students from ${registration.teamMembers[0].department} department are participating in "${event.title}" event on ${formatDate(event.date)}.
       
       Team Name: ${registration.teamName}
       Team Members:
