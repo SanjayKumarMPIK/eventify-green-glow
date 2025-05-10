@@ -142,9 +142,10 @@ export function StudentDashboard() {
                   {getEventById(showCertificate.eventId)?.title}
                 </p>
                 <p className="text-lg mb-10">
-                  held on {getEventById(showCertificate.eventId)?.date instanceof Date 
-                    ? formatDate(getEventById(showCertificate.eventId)?.date as Date) 
-                    : formatDate(new Date(getEventById(showCertificate.eventId)?.date as string))}
+                  held on {(() => {
+                    const eventDate = getEventById(showCertificate.eventId)?.date;
+                    return eventDate ? formatDate(eventDate) : '';
+                  })()}
                 </p>
                 <div className="flex justify-between pt-10">
                   <div>
