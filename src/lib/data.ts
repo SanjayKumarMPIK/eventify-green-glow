@@ -1,6 +1,9 @@
 
 import { Event, Registration, User } from "@/types";
 
+// Admin code
+export const ADMIN_CODE = "ADMIN123";
+
 // Mock Users
 export const USERS: User[] = [
   {
@@ -95,5 +98,3 @@ export const validateEmail = (email: string) => {
   const regex = /^[a-zA-Z]+\.[0-9]{6}@[a-zA-Z]+\.ritchennai\.edu\.in$/;
   return regex.test(email);
 };
-
-export const ADMIN_CODE = "ADMIN123";

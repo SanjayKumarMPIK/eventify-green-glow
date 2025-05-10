@@ -1,20 +1,41 @@
 
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { USERS } from "@/lib/data";
+import { User, UserRole } from "@/types";
 import { StudentDashboard } from "@/components/StudentDashboard";
 import { AdminDashboard } from "@/components/AdminDashboard";
-import { UserRole } from "@/types";
 
 const Dashboard = () => {
-  // In a real app, this would come from authentication context/state
-  const [userRole, setUserRole] = useState<UserRole>("student");
+  const navigate = useNavigate();
+  const [user, setUser] = useState<User | null>(null);
+  
+  useEffect(() => {
+    // In a real app, this would come from authentication context/state
+    const storedUser = localStorage.getItem("currentUser");
+    if (!storedUser) {
+      navigate("/login");
+      return;
+    }
+    
+    try {
+      const parsedUser = JSON.parse(storedUser);
+      setUser(parsedUser);
+    } catch (e) {
+      localStorage.removeItem("currentUser");
+      navigate("/login");
+    }
+  }, [navigate]);
   
   const handleLogout = () => {
-    // In a real app, this would clear auth state
-    window.location.href = "/";
+    localStorage.removeItem("currentUser");
+    navigate("/");
   };
+
+  if (!user) {
+    return null; // Loading state or redirect handled by useEffect
+  }
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -28,23 +49,12 @@ const Dashboard = () => {
           </div>
           <div className="flex flex-1 items-center justify-end space-x-2">
             <nav className="flex items-center space-x-4">
-              {/* For demo purposes - in a real app this would be handled properly */}
-              <Tabs defaultValue={userRole} className="mr-4">
-                <TabsList>
-                  <TabsTrigger 
-                    value="student" 
-                    onClick={() => setUserRole("student")}
-                  >
-                    Student View
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="admin" 
-                    onClick={() => setUserRole("admin")}
-                  >
-                    Admin View
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
+              <Link to="/dashboard" className="text-sm font-medium">
+                Dashboard
+              </Link>
+              <Link to="/explore" className="text-sm font-medium">
+                Explore Events
+              </Link>
               <Button variant="outline" onClick={handleLogout}>
                 Logout
               </Button>
@@ -57,16 +67,16 @@ const Dashboard = () => {
       <main className="flex-1 container py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold tracking-tight">
-            {userRole === "admin" ? "Admin Dashboard" : "Student Dashboard"}
+            {user.role === "admin" ? "Admin Dashboard" : "Student Dashboard"}
           </h1>
           <p className="text-muted-foreground mt-1">
-            {userRole === "admin" 
+            {user.role === "admin" 
               ? "Manage events and view registrations" 
-              : "Register for events and view your registrations"}
+              : "View your registered events and certificates"}
           </p>
         </div>
 
-        {userRole === "admin" ? (
+        {user.role === "admin" ? (
           <AdminDashboard />
         ) : (
           <StudentDashboard />

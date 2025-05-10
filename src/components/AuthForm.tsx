@@ -8,7 +8,7 @@ import { UserRole } from "@/types";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { ADMIN_CODE, validateEmail } from "@/lib/data";
+import { ADMIN_CODE, validateEmail, USERS } from "@/lib/data";
 
 interface AuthFormProps {
   type: "login" | "register";
@@ -34,13 +34,47 @@ export function AuthForm({ type }: AuthFormProps) {
 
     // Validate admin code if role is admin
     if (role === "admin" && adminCode !== ADMIN_CODE) {
-      toast.error("Invalid admin code");
+      toast.error("Invalid admin code. The correct code is ADMIN123");
       return;
     }
 
-    // In a real app, you would call an API to login/register
-    toast.success(`${type === "login" ? "Logged in" : "Registered"} successfully as ${role}`);
-    navigate("/dashboard");
+    if (type === "login") {
+      // Check if user exists in mock data
+      const user = USERS.find(u => u.email === email);
+      if (!user) {
+        toast.error("User not found. Please register first.");
+        return;
+      }
+
+      // In a real app, you would validate the password here
+      
+      // Store user in localStorage
+      localStorage.setItem("currentUser", JSON.stringify(user));
+      toast.success(`Logged in successfully as ${role}`);
+      navigate("/dashboard");
+    } else {
+      // Registration
+      // Create a new user
+      const newUser = {
+        id: (Date.now()).toString(),
+        email,
+        name,
+        role,
+        department: role === "student" ? department : undefined
+      };
+
+      // In a real app, you would store this in a database
+      // For now, we'll just use localStorage
+      const existingUsers = JSON.parse(localStorage.getItem("users") || JSON.stringify(USERS));
+      existingUsers.push(newUser);
+      localStorage.setItem("users", JSON.stringify(existingUsers));
+      
+      // Log in the new user automatically
+      localStorage.setItem("currentUser", JSON.stringify(newUser));
+      
+      toast.success(`Registered successfully as ${role}`);
+      navigate("/dashboard");
+    }
   };
 
   return (
@@ -143,6 +177,11 @@ export function AuthForm({ type }: AuthFormProps) {
                     onChange={(e) => setAdminCode(e.target.value)}
                     required 
                   />
+                  {type === "login" && (
+                    <p className="text-xs text-muted-foreground">
+                      Hint: The admin code is ADMIN123
+                    </p>
+                  )}
                 </div>
               )}
             </div>
