@@ -2,7 +2,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { USERS } from "@/lib/data";
 import { User, UserRole } from "@/types";
 import { StudentDashboard } from "@/components/StudentDashboard";
 import { AdminDashboard } from "@/components/AdminDashboard";
