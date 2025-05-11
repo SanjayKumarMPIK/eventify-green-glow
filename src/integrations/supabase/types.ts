@@ -9,6 +9,124 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      events: {
+        Row: {
+          available_slots: number
+          created_at: string
+          creator_id: string
+          date: string
+          description: string | null
+          id: string
+          image_url: string | null
+          location: string
+          title: string
+          total_slots: number
+          updated_at: string
+        }
+        Insert: {
+          available_slots: number
+          created_at?: string
+          creator_id: string
+          date: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          location: string
+          title: string
+          total_slots: number
+          updated_at?: string
+        }
+        Update: {
+          available_slots?: number
+          created_at?: string
+          creator_id?: string
+          date?: string
+          description?: string | null
+          id?: string
+          image_url?: string | null
+          location?: string
+          title?: string
+          total_slots?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      registrations: {
+        Row: {
+          attended: boolean | null
+          certificate_generated: boolean | null
+          event_id: string
+          id: string
+          od_letter_generated: boolean | null
+          registration_date: string
+          team_name: string
+          user_id: string
+        }
+        Insert: {
+          attended?: boolean | null
+          certificate_generated?: boolean | null
+          event_id: string
+          id?: string
+          od_letter_generated?: boolean | null
+          registration_date?: string
+          team_name: string
+          user_id: string
+        }
+        Update: {
+          attended?: boolean | null
+          certificate_generated?: boolean | null
+          event_id?: string
+          id?: string
+          od_letter_generated?: boolean | null
+          registration_date?: string
+          team_name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "registrations_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_members: {
+        Row: {
+          department: string
+          email: string
+          id: string
+          name: string
+          registration_id: string
+          roll_number: string | null
+        }
+        Insert: {
+          department: string
+          email: string
+          id?: string
+          name: string
+          registration_id: string
+          roll_number?: string | null
+        }
+        Update: {
+          department?: string
+          email?: string
+          id?: string
+          name?: string
+          registration_id?: string
+          roll_number?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_registration_id_fkey"
+            columns: ["registration_id"]
+            isOneToOne: false
+            referencedRelation: "registrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           created_at: string

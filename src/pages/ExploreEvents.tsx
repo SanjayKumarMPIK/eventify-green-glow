@@ -1,55 +1,141 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { EventCard } from "@/components/EventCard";
-import { EVENTS } from "@/lib/data";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { User, TeamMember, Event } from "@/types";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const ExploreEvents = () => {
+  const navigate = useNavigate();
   const { user: authUser, signOut } = useAuth();
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [teamName, setTeamName] = useState("");
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   
-  // Create a user object from the auth user
-  const user: User | null = authUser ? {
-    id: authUser.id,
-    email: authUser.email || '',
-    name: authUser.user_metadata?.name || 'User',
-    role: (authUser.user_metadata?.role as any) || 'student',
-    department: authUser.user_metadata?.department || ''
-  } : null;
+  useEffect(() => {
+    if (!authUser) {
+      navigate("/login");
+      return;
+    }
+    
+    const fetchUserAndEvents = async () => {
+      try {
+        // Fetch user details
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', authUser.id)
+          .single();
+          
+        if (userError) {
+          console.error("Error fetching user details:", userError);
+          
+          // Create a user object from auth user data if we can't get it from the database
+          const user: User = {
+            id: authUser.id,
+            email: authUser.email || '',
+            name: authUser.user_metadata?.name || 'User',
+            role: (authUser.user_metadata?.role as any) || 'student',
+            department: authUser.user_metadata?.department || ''
+          };
+          
+          setCurrentUser(user);
+        } else {
+          const user: User = {
+            id: userData.id,
+            email: authUser.email || '',
+            name: userData.name,
+            role: userData.role as any,
+            department: userData.department || ''
+          };
+          
+          setCurrentUser(user);
+        }
+        
+        // Fetch events
+        const { data: eventsData, error: eventsError } = await supabase
+          .from('events')
+          .select('*')
+          .order('date', { ascending: true });
+          
+        if (eventsError) {
+          throw eventsError;
+        }
+        
+        const processedEvents: Event[] = eventsData.map(event => ({
+          id: event.id,
+          title: event.title,
+          description: event.description || '',
+          date: new Date(event.date),
+          location: event.location,
+          totalSlots: event.total_slots,
+          availableSlots: event.available_slots,
+          creatorId: event.creator_id,
+          registrations: [],
+          imageUrl: event.image_url
+        }));
+        
+        setEvents(processedEvents);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        toast.error("Failed to load events");
+      }
+    };
+    
+    fetchUserAndEvents();
+  }, [authUser, navigate]);
   
   const handleLogout = () => {
     signOut();
   };
 
-  const handleRegister = (eventId: string) => {
-    if (!user) return;
+  const handleRegister = async (eventId: string) => {
+    if (!authUser) {
+      toast.error("You must be logged in to register");
+      return;
+    }
     
     // Check if user has already registered for this event
-    const registrations = JSON.parse(localStorage.getItem("userRegistrations") || "[]");
-    const alreadyRegistered = registrations.some((reg: any) => reg.eventId === eventId && reg.userId === user.id);
-    
-    if (alreadyRegistered) {
-      toast.error("You have already registered for this event");
+    try {
+      const { data, error } = await supabase
+        .from('registrations')
+        .select('id')
+        .eq('event_id', eventId)
+        .eq('user_id', authUser.id);
+        
+      if (error) {
+        throw error;
+      }
+      
+      if (data && data.length > 0) {
+        toast.error("You have already registered for this event");
+        return;
+      }
+    } catch (error) {
+      console.error("Error checking registration:", error);
+      toast.error("Failed to check registration status");
       return;
     }
     
     setSelectedEventId(eventId);
     
     // Initialize with the current user's details
-    setTeamName("");
-    setTeamMembers([{
-      name: user.name,
-      email: user.email,
-      department: user.department || ""
-    }]);
+    if (currentUser) {
+      setTeamName("");
+      setTeamMembers([{
+        name: currentUser.name,
+        email: currentUser.email,
+        department: currentUser.department || ""
+      }]);
+    }
   };
 
   const handleAddTeamMember = () => {
@@ -63,73 +149,76 @@ const ExploreEvents = () => {
     setTeamMembers(newTeamMembers);
   };
 
-  const handleTeamMemberChange = (index: number, field: string, value: string) => {
+  const handleTeamMemberChange = (index: number, field: keyof TeamMember, value: string) => {
     if (index === 0) return; // Don't allow changing the first member's details (current user)
     const newTeamMembers = [...teamMembers];
     newTeamMembers[index] = { ...newTeamMembers[index], [field]: value };
     setTeamMembers(newTeamMembers);
   };
 
-  const handleSubmitRegistration = () => {
-    if (!user || !selectedEventId) return;
+  const handleSubmitRegistration = async () => {
+    if (!authUser || !selectedEventId) return;
     
-    // Get the event to update available slots
-    const allEvents = JSON.parse(localStorage.getItem("events") || JSON.stringify(EVENTS));
-    const updatedEvents = allEvents.map((event: Event) => {
-      if (event.id === selectedEventId) {
-        return {
-          ...event,
-          availableSlots: Math.max(0, event.availableSlots - 1),
-          registrations: [
-            ...event.registrations,
-            {
-              id: Date.now().toString(),
-              eventId: selectedEventId,
-              userId: user.id,
-              teamName: teamName || `${user.name}'s Team`,
-              teamMembers,
-              registrationDate: new Date()
-            }
-          ]
-        };
+    try {
+      // Insert registration
+      const finalTeamName = teamName || `${teamMembers[0].name}'s Team`;
+      
+      const { data: regData, error: regError } = await supabase
+        .from('registrations')
+        .insert([{
+          event_id: selectedEventId,
+          user_id: authUser.id,
+          team_name: finalTeamName
+        }])
+        .select();
+        
+      if (regError) {
+        throw regError;
       }
-      return event;
-    });
-    
-    // Update events in localStorage
-    localStorage.setItem("events", JSON.stringify(updatedEvents));
-    
-    // Update user registrations
-    const registrations = JSON.parse(localStorage.getItem("userRegistrations") || "[]");
-    registrations.push({
-      id: Date.now().toString(),
-      eventId: selectedEventId,
-      userId: user.id,
-      teamName: teamName || `${user.name}'s Team`,
-      teamMembers,
-      registrationDate: new Date()
-    });
-    localStorage.setItem("userRegistrations", JSON.stringify(registrations));
-    
-    setSelectedEventId(null);
-    setTeamName("");
-    setTeamMembers([]);
-    toast.success("Registration successful");
+      
+      const registrationId = regData[0].id;
+      
+      // Insert team members
+      const teamMembersToInsert = teamMembers.map(member => ({
+        registration_id: registrationId,
+        name: member.name,
+        email: member.email,
+        department: member.department,
+        roll_number: member.roll_number || null
+      }));
+      
+      const { error: teamError } = await supabase
+        .from('team_members')
+        .insert(teamMembersToInsert);
+        
+      if (teamError) {
+        throw teamError;
+      }
+      
+      // Update the UI by decrementing the available slots
+      setEvents(prev => 
+        prev.map(event => 
+          event.id === selectedEventId 
+            ? { ...event, availableSlots: Math.max(0, event.availableSlots - 1) } 
+            : event
+        )
+      );
+      
+      setSelectedEventId(null);
+      setTeamName("");
+      setTeamMembers([]);
+      toast.success("Registration successful");
+    } catch (error: any) {
+      console.error("Error registering:", error);
+      
+      if (error.message?.includes("No available slots") || 
+          error.message?.includes("User has already registered")) {
+        toast.error(error.message);
+      } else {
+        toast.error("Failed to register for the event");
+      }
+    }
   };
-
-  if (!user) {
-    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
-  }
-
-  // Get events from localStorage or use the default ones
-  const storedEvents = localStorage.getItem("events");
-  const rawEvents = storedEvents ? JSON.parse(storedEvents) : EVENTS;
-  
-  // Convert event dates from strings to Date objects
-  const events = rawEvents.map((event: any) => ({
-    ...event,
-    date: new Date(event.date)
-  }));
 
   return (
     <div className="flex flex-col min-h-screen">

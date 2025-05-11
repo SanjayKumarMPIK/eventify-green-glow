@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FileText, Eye } from "lucide-react";
 import { Event, Registration } from "@/types";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface ODLetterGeneratorProps {
   registration: Registration;
@@ -42,9 +44,25 @@ export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProp
       Eventify Platform
     `;
 
-  const handleGenerateOD = () => {
-    console.log("Generated OD Letter Content: ", odLetterContent);
-    // In a real app, this would generate a PDF
+  const handleGenerateOD = async () => {
+    try {
+      // Update od_letter_generated flag
+      const { error } = await supabase
+        .from('registrations')
+        .update({ od_letter_generated: true })
+        .eq('id', registration.id);
+        
+      if (error) {
+        throw error;
+      }
+      
+      console.log("Generated OD Letter Content: ", odLetterContent);
+      toast.success("OD Letter downloaded");
+      setIsOpen(false);
+    } catch (error) {
+      console.error("Error updating OD letter status:", error);
+      toast.error("Failed to update OD letter status");
+    }
   };
 
   return (

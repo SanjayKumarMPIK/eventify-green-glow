@@ -8,43 +8,152 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FileIcon, Download } from "lucide-react";
 import { Link } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 
 export function StudentDashboard() {
   const [myRegistrations, setMyRegistrations] = useState<Registration[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [showCertificate, setShowCertificate] = useState<Registration | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const { user: authUser } = useAuth();
 
   useEffect(() => {
-    // Get current user
-    const userJson = localStorage.getItem("currentUser");
-    if (userJson) {
-      const user = JSON.parse(userJson);
-      setCurrentUser(user);
+    const fetchData = async () => {
+      if (!authUser) return;
       
-      // Get registrations for current user
-      const allRegistrations = JSON.parse(localStorage.getItem("userRegistrations") || "[]");
-      
-      // Convert dates from strings to Date objects
-      const processedRegistrations = allRegistrations.map((reg: any) => ({
-        ...reg,
-        registrationDate: new Date(reg.registrationDate)
-      }));
-      
-      const userRegistrations = processedRegistrations.filter((reg: Registration) => 
-        reg.userId === user.id
-      );
-      setMyRegistrations(userRegistrations);
-      
-      // Get all events and convert dates
-      const allEvents = JSON.parse(localStorage.getItem("events") || "[]");
-      const processedEvents = allEvents.map((event: any) => ({
-        ...event,
-        date: new Date(event.date)
-      }));
-      setEvents(processedEvents);
-    }
-  }, []);
+      try {
+        // Fetch current user details
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', authUser.id)
+          .single();
+          
+        if (userError) {
+          console.error("Error fetching user details:", userError);
+          toast.error("Could not fetch user details");
+          return;
+        }
+        
+        const user: User = {
+          id: userData.id,
+          email: authUser.email || '',
+          name: userData.name,
+          role: userData.role as UserRole,
+          department: userData.department
+        };
+        
+        setCurrentUser(user);
+        
+        // Fetch user registrations
+        const { data: registrationData, error: registrationError } = await supabase
+          .from('registrations')
+          .select(`
+            id,
+            event_id,
+            user_id,
+            team_name,
+            registration_date,
+            attended,
+            certificate_generated,
+            od_letter_generated
+          `)
+          .eq('user_id', authUser.id);
+          
+        if (registrationError) {
+          console.error("Error fetching registrations:", registrationError);
+          toast.error("Could not fetch your registrations");
+          return;
+        }
+        
+        // Fetch event details for each registration
+        const eventIds = registrationData.map(reg => reg.event_id);
+        
+        if (eventIds.length === 0) {
+          setMyRegistrations([]);
+          return;
+        }
+        
+        const { data: eventData, error: eventError } = await supabase
+          .from('events')
+          .select('*')
+          .in('id', eventIds);
+          
+        if (eventError) {
+          console.error("Error fetching events:", eventError);
+          toast.error("Could not fetch event details");
+          return;
+        }
+        
+        // Fetch team members for each registration
+        const registrationIds = registrationData.map(reg => reg.id);
+        
+        const { data: teamMembersData, error: teamMembersError } = await supabase
+          .from('team_members')
+          .select('*')
+          .in('registration_id', registrationIds);
+          
+        if (teamMembersError) {
+          console.error("Error fetching team members:", teamMembersError);
+          toast.error("Could not fetch team members");
+          return;
+        }
+        
+        // Map events to a dictionary for easier lookup
+        const eventsMap = eventData.reduce((acc, event) => {
+          acc[event.id] = {
+            id: event.id,
+            title: event.title,
+            description: event.description || '',
+            date: new Date(event.date),
+            location: event.location,
+            totalSlots: event.total_slots,
+            availableSlots: event.available_slots,
+            creatorId: event.creator_id,
+            registrations: [],
+            imageUrl: event.image_url
+          };
+          return acc;
+        }, {} as Record<string, Event>);
+        
+        // Map team members to registrations
+        const teamMembersByRegistration = teamMembersData.reduce((acc, member) => {
+          if (!acc[member.registration_id]) {
+            acc[member.registration_id] = [];
+          }
+          acc[member.registration_id].push({
+            name: member.name,
+            email: member.email,
+            department: member.department,
+            roll_number: member.roll_number
+          });
+          return acc;
+        }, {} as Record<string, TeamMember[]>);
+        
+        // Construct registrations with event and team member data
+        const processedRegistrations = registrationData.map(reg => ({
+          id: reg.id,
+          eventId: reg.event_id,
+          userId: reg.user_id,
+          teamName: reg.team_name,
+          registrationDate: new Date(reg.registration_date),
+          attended: reg.attended,
+          certificate_generated: reg.certificate_generated,
+          od_letter_generated: reg.od_letter_generated,
+          teamMembers: teamMembersByRegistration[reg.id] || []
+        }));
+        
+        setMyRegistrations(processedRegistrations);
+        setEvents(Object.values(eventsMap));
+      } catch (error) {
+        console.error("Unexpected error:", error);
+        toast.error("Something went wrong. Please try again later.");
+      }
+    };
+    
+    fetchData();
+  }, [authUser]);
 
   const getEventById = (eventId: string): Event | undefined => {
     return events.find((e) => e.id === eventId);
@@ -65,10 +174,26 @@ export function StudentDashboard() {
     setShowCertificate(registration);
   };
 
-  const downloadCertificate = () => {
-    // In a real app, this would create a PDF and download it
-    toast.success("Certificate downloaded");
-    setShowCertificate(null);
+  const downloadCertificate = async () => {
+    if (!showCertificate) return;
+    
+    try {
+      // Update certificate_generated flag
+      const { error } = await supabase
+        .from('registrations')
+        .update({ certificate_generated: true })
+        .eq('id', showCertificate.id);
+        
+      if (error) {
+        throw error;
+      }
+      
+      toast.success("Certificate downloaded");
+      setShowCertificate(null);
+    } catch (error) {
+      console.error("Error updating certificate status:", error);
+      toast.error("Failed to update certificate status");
+    }
   };
 
   return (

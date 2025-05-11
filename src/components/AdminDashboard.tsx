@@ -1,45 +1,180 @@
+
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useState } from "react";
 import { EventCard } from "./EventCard";
-import { EVENTS } from "@/lib/data";
-import { Event, Registration } from "@/types";
+import { Event, Registration, TeamMember } from "@/types";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/context/AuthContext";
 
 export function AdminDashboard() {
-  const [events, setEvents] = useState(EVENTS);
+  const [events, setEvents] = useState<Event[]>([]);
   const [isAddEventOpen, setIsAddEventOpen] = useState(false);
   const [isViewRegistrationsOpen, setIsViewRegistrationsOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [eventTitle, setEventTitle] = useState("");
   const [eventDescription, setEventDescription] = useState("");
   const [eventDate, setEventDate] = useState("");
   const [eventLocation, setEventLocation] = useState("");
   const [eventSlots, setEventSlots] = useState("0");
   const [eventImageUrl, setEventImageUrl] = useState("");
+  const { user: authUser } = useAuth();
 
-  const handleAddEvent = () => {
-    const newEvent: Event = {
-      id: (events.length + 1).toString(),
-      title: eventTitle,
-      description: eventDescription,
-      date: new Date(eventDate),
-      location: eventLocation,
-      totalSlots: parseInt(eventSlots),
-      availableSlots: parseInt(eventSlots),
-      creatorId: "1", // Current admin user
-      registrations: [],
-      imageUrl: eventImageUrl || undefined,
-    };
+  useEffect(() => {
+    fetchEvents();
+  }, []);
 
-    setEvents([...events, newEvent]);
-    resetEventForm();
-    setIsAddEventOpen(false);
-    toast.success("Event added successfully");
+  const fetchEvents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .order('created_at', { ascending: false });
+        
+      if (error) {
+        throw error;
+      }
+      
+      const processedEvents: Event[] = data.map(event => ({
+        id: event.id,
+        title: event.title,
+        description: event.description || '',
+        date: new Date(event.date),
+        location: event.location,
+        totalSlots: event.total_slots,
+        availableSlots: event.available_slots,
+        creatorId: event.creator_id,
+        registrations: [],
+        imageUrl: event.image_url
+      }));
+      
+      setEvents(processedEvents);
+    } catch (error) {
+      console.error("Error fetching events:", error);
+      toast.error("Failed to load events");
+    }
+  };
+
+  const fetchRegistrationsForEvent = async (eventId: string) => {
+    try {
+      // Get registrations for the event
+      const { data: registrationData, error: registrationError } = await supabase
+        .from('registrations')
+        .select('*')
+        .eq('event_id', eventId);
+        
+      if (registrationError) {
+        throw registrationError;
+      }
+      
+      // Get team members for these registrations
+      const registrationIds = registrationData.map(reg => reg.id);
+      
+      if (registrationIds.length === 0) {
+        setRegistrations([]);
+        return [];
+      }
+      
+      const { data: teamMembersData, error: teamMembersError } = await supabase
+        .from('team_members')
+        .select('*')
+        .in('registration_id', registrationIds);
+        
+      if (teamMembersError) {
+        throw teamMembersError;
+      }
+      
+      // Organize team members by registration
+      const teamMembersByRegistration = teamMembersData.reduce((acc, member) => {
+        if (!acc[member.registration_id]) {
+          acc[member.registration_id] = [];
+        }
+        acc[member.registration_id].push({
+          name: member.name,
+          email: member.email,
+          department: member.department,
+          roll_number: member.roll_number
+        });
+        return acc;
+      }, {} as Record<string, TeamMember[]>);
+      
+      // Create final registration objects
+      const processedRegistrations = registrationData.map(reg => ({
+        id: reg.id,
+        eventId: reg.event_id,
+        userId: reg.user_id,
+        teamName: reg.team_name,
+        registrationDate: new Date(reg.registration_date),
+        attended: reg.attended,
+        certificate_generated: reg.certificate_generated,
+        od_letter_generated: reg.od_letter_generated,
+        teamMembers: teamMembersByRegistration[reg.id] || []
+      }));
+      
+      setRegistrations(processedRegistrations);
+      return processedRegistrations;
+    } catch (error) {
+      console.error("Error fetching registrations:", error);
+      toast.error("Failed to load registrations");
+      return [];
+    }
+  };
+
+  const handleAddEvent = async () => {
+    if (!authUser) {
+      toast.error("You must be logged in to create an event");
+      return;
+    }
+    
+    try {
+      const newEvent = {
+        title: eventTitle,
+        description: eventDescription,
+        date: new Date(eventDate).toISOString(),
+        location: eventLocation,
+        total_slots: parseInt(eventSlots),
+        available_slots: parseInt(eventSlots),
+        creator_id: authUser.id,
+        image_url: eventImageUrl || null
+      };
+      
+      const { data, error } = await supabase
+        .from('events')
+        .insert([newEvent])
+        .select();
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Add the new event to the state
+      const processedEvent: Event = {
+        id: data[0].id,
+        title: data[0].title,
+        description: data[0].description || '',
+        date: new Date(data[0].date),
+        location: data[0].location,
+        totalSlots: data[0].total_slots,
+        availableSlots: data[0].available_slots,
+        creatorId: data[0].creator_id,
+        registrations: [],
+        imageUrl: data[0].image_url
+      };
+      
+      setEvents([processedEvent, ...events]);
+      resetEventForm();
+      setIsAddEventOpen(false);
+      toast.success("Event added successfully");
+    } catch (error) {
+      console.error("Error adding event:", error);
+      toast.error("Failed to add event");
+    }
   };
 
   const handleEditEvent = (eventId: string) => {
@@ -56,61 +191,121 @@ export function AdminDashboard() {
     setIsAddEventOpen(true);
   };
 
-  const handleUpdateEvent = () => {
-    if (!selectedEvent) return;
+  const handleUpdateEvent = async () => {
+    if (!selectedEvent || !authUser) return;
 
-    const updatedEvents = events.map((event) => {
-      if (event.id === selectedEvent.id) {
-        return {
-          ...event,
-          title: eventTitle,
-          description: eventDescription,
-          date: new Date(eventDate),
-          location: eventLocation,
-          totalSlots: parseInt(eventSlots),
-          // Keep available slots up to date with the difference
-          availableSlots: parseInt(eventSlots) - (event.totalSlots - event.availableSlots),
-          imageUrl: eventImageUrl || undefined,
-        };
+    try {
+      const updatedEvent = {
+        title: eventTitle,
+        description: eventDescription,
+        date: new Date(eventDate).toISOString(),
+        location: eventLocation,
+        total_slots: parseInt(eventSlots),
+        available_slots: parseInt(eventSlots) - (selectedEvent.totalSlots - selectedEvent.availableSlots),
+        image_url: eventImageUrl || null
+      };
+      
+      const { error } = await supabase
+        .from('events')
+        .update(updatedEvent)
+        .eq('id', selectedEvent.id);
+        
+      if (error) {
+        throw error;
       }
-      return event;
-    });
+      
+      // Update the event in the state
+      const updatedEvents = events.map((event) => {
+        if (event.id === selectedEvent.id) {
+          return {
+            ...event,
+            title: eventTitle,
+            description: eventDescription,
+            date: new Date(eventDate),
+            location: eventLocation,
+            totalSlots: parseInt(eventSlots),
+            availableSlots: parseInt(eventSlots) - (selectedEvent.totalSlots - selectedEvent.availableSlots),
+            imageUrl: eventImageUrl || undefined,
+          };
+        }
+        return event;
+      });
 
-    setEvents(updatedEvents);
-    resetEventForm();
-    setIsAddEventOpen(false);
-    toast.success("Event updated successfully");
+      setEvents(updatedEvents);
+      resetEventForm();
+      setIsAddEventOpen(false);
+      toast.success("Event updated successfully");
+    } catch (error) {
+      console.error("Error updating event:", error);
+      toast.error("Failed to update event");
+    }
   };
 
-  const handleDeleteEvent = (eventId: string) => {
-    const updatedEvents = events.filter((event) => event.id !== eventId);
-    setEvents(updatedEvents);
-    toast.success("Event deleted successfully");
+  const handleDeleteEvent = async (eventId: string) => {
+    try {
+      const { error } = await supabase
+        .from('events')
+        .delete()
+        .eq('id', eventId);
+        
+      if (error) {
+        throw error;
+      }
+      
+      const updatedEvents = events.filter((event) => event.id !== eventId);
+      setEvents(updatedEvents);
+      toast.success("Event deleted successfully");
+    } catch (error) {
+      console.error("Error deleting event:", error);
+      toast.error("Failed to delete event");
+    }
   };
 
-  const handleViewRegistrations = (eventId: string) => {
+  const handleViewRegistrations = async (eventId: string) => {
     const event = events.find((e) => e.id === eventId);
     if (!event) return;
 
     setSelectedEvent(event);
+    await fetchRegistrationsForEvent(eventId);
     setIsViewRegistrationsOpen(true);
   };
 
-  const handleIncrementSlots = (eventId: string) => {
-    const updatedEvents = events.map((event) => {
-      if (event.id === eventId) {
-        const newTotalSlots = event.totalSlots + 10;
-        return {
-          ...event,
-          totalSlots: newTotalSlots,
-          availableSlots: event.availableSlots + 10,
-        };
+  const handleIncrementSlots = async (eventId: string) => {
+    try {
+      const event = events.find(e => e.id === eventId);
+      if (!event) return;
+      
+      const newTotalSlots = event.totalSlots + 10;
+      
+      const { error } = await supabase
+        .from('events')
+        .update({
+          total_slots: newTotalSlots,
+          available_slots: event.availableSlots + 10
+        })
+        .eq('id', eventId);
+        
+      if (error) {
+        throw error;
       }
-      return event;
-    });
+      
+      const updatedEvents = events.map((event) => {
+        if (event.id === eventId) {
+          return {
+            ...event,
+            totalSlots: newTotalSlots,
+            availableSlots: event.availableSlots + 10,
+          };
+        }
+        return event;
+      });
 
-    setEvents(updatedEvents);
-    toast.success("Added 10 slots to the event");
+      setEvents(updatedEvents);
+      toast.success("Added 10 slots to the event");
+    } catch (error) {
+      console.error("Error adding slots:", error);
+      toast.error("Failed to add slots");
+    }
   };
 
   const resetEventForm = () => {
@@ -121,6 +316,14 @@ export function AdminDashboard() {
     setEventSlots("0");
     setEventImageUrl("");
     setSelectedEvent(null);
+  };
+
+  const formatDate = (date: Date): string => {
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
   };
 
   return (
@@ -241,13 +444,13 @@ export function AdminDashboard() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            {selectedEvent?.registrations.length ? (
-              selectedEvent.registrations.map((registration: Registration) => (
+            {registrations.length > 0 ? (
+              registrations.map((registration) => (
                 <Card key={registration.id} className="mb-4">
                   <CardHeader>
                     <CardTitle className="text-lg">Team: {registration.teamName}</CardTitle>
                     <CardDescription>
-                      Registered on {registration.registrationDate.toLocaleDateString()}
+                      Registered on {formatDate(registration.registrationDate)}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
@@ -258,6 +461,9 @@ export function AdminDashboard() {
                           <p><strong>Name:</strong> {member.name}</p>
                           <p><strong>Email:</strong> {member.email}</p>
                           <p><strong>Department:</strong> {member.department}</p>
+                          {member.roll_number && (
+                            <p><strong>Roll Number:</strong> {member.roll_number}</p>
+                          )}
                         </div>
                       ))}
                     </div>

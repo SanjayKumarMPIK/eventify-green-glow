@@ -13,6 +13,7 @@ export interface TeamMember {
   name: string;
   email: string;
   department: string;
+  roll_number?: string;
 }
 
 export interface Registration {
@@ -22,6 +23,9 @@ export interface Registration {
   teamName: string;
   teamMembers: TeamMember[];
   registrationDate: Date;
+  attended?: boolean;
+  certificate_generated?: boolean;
+  od_letter_generated?: boolean;
 }
 
 export interface Event {
