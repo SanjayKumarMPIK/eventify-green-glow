@@ -24,15 +24,15 @@ const Dashboard = () => {
         return;
       }
       
-      // Fetch user profile from profiles table
-      const { data: profile, error } = await supabase
-        .from('profiles')
+      // Fetch user profile from users table
+      const { data: userRecord, error } = await supabase
+        .from('users')
         .select('*')
         .eq('id', authUser.user.id)
         .single();
       
-      if (error || !profile) {
-        console.error("Error fetching profile:", error);
+      if (error || !userRecord) {
+        console.error("Error fetching user:", error);
         return;
       }
       
@@ -40,13 +40,13 @@ const Dashboard = () => {
       const appUser: User = {
         id: authUser.user.id,
         email: authUser.user.email || '',
-        name: profile.name,
-        role: profile.role as UserRole,
-        department: profile.department
+        name: userRecord.name,
+        role: userRecord.role as UserRole,
+        department: userRecord.department
       };
       
       setUser(appUser);
-      setUserRole(profile.role as UserRole);
+      setUserRole(userRecord.role as UserRole);
     };
     
     fetchUserProfile();
