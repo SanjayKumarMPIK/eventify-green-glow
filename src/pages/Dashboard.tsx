@@ -7,6 +7,7 @@ import { StudentDashboard } from "@/components/StudentDashboard";
 import { AdminDashboard } from "@/components/AdminDashboard";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -30,8 +31,42 @@ const Dashboard = () => {
         .eq('id', authUser.user.id)
         .single();
       
-      if (error || !userRecord) {
+      if (error) {
         console.error("Error fetching user:", error);
+        
+        // If no user record found, create one using the auth user metadata
+        if (error.code === "PGRST116") {
+          const { email, user_metadata } = authUser.user;
+          
+          const newUser: User = {
+            id: authUser.user.id,
+            email: email || '',
+            name: user_metadata?.name || 'New User',
+            role: (user_metadata?.role as UserRole) || 'student',
+            department: user_metadata?.department || ''
+          };
+          
+          // Insert the new user record
+          const { error: insertError } = await supabase
+            .from('users')
+            .insert([{
+              id: newUser.id,
+              name: newUser.name,
+              role: newUser.role,
+              department: newUser.department
+            }]);
+            
+          if (insertError) {
+            console.error("Error creating user record:", insertError);
+            toast.error("Failed to create user profile");
+            return;
+          }
+          
+          setUser(newUser);
+          setUserRole(newUser.role);
+          return;
+        }
+        
         return;
       }
       

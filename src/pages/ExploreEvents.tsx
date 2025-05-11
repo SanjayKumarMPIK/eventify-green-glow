@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -9,35 +8,25 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { User, TeamMember, Event } from "@/types";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 
 const ExploreEvents = () => {
-  const navigate = useNavigate();
+  const { user: authUser, signOut } = useAuth();
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [teamName, setTeamName] = useState("");
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   
-  // Get the current user from localStorage
-  const getCurrentUser = (): User | null => {
-    const storedUser = localStorage.getItem("currentUser");
-    if (!storedUser) {
-      navigate("/login");
-      return null;
-    }
-    
-    try {
-      return JSON.parse(storedUser);
-    } catch (e) {
-      localStorage.removeItem("currentUser");
-      navigate("/login");
-      return null;
-    }
-  };
-  
-  const user = getCurrentUser();
+  // Create a user object from the auth user
+  const user: User | null = authUser ? {
+    id: authUser.id,
+    email: authUser.email || '',
+    name: authUser.user_metadata?.name || 'User',
+    role: (authUser.user_metadata?.role as any) || 'student',
+    department: authUser.user_metadata?.department || ''
+  } : null;
   
   const handleLogout = () => {
-    localStorage.removeItem("currentUser");
-    navigate("/");
+    signOut();
   };
 
   const handleRegister = (eventId: string) => {
@@ -129,7 +118,7 @@ const ExploreEvents = () => {
   };
 
   if (!user) {
-    return null; // Loading state or redirect handled by getCurrentUser
+    return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
   }
 
   // Get events from localStorage or use the default ones
