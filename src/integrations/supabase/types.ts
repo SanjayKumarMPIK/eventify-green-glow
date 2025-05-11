@@ -9,188 +9,16 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      events: {
-        Row: {
-          available_slots: number
-          created_at: string | null
-          created_by: string
-          date: string
-          description: string
-          id: string
-          image_url: string
-          location: string
-          title: string
-          total_slots: number
-        }
-        Insert: {
-          available_slots: number
-          created_at?: string | null
-          created_by: string
-          date: string
-          description: string
-          id?: string
-          image_url: string
-          location: string
-          title: string
-          total_slots: number
-        }
-        Update: {
-          available_slots?: number
-          created_at?: string | null
-          created_by?: string
-          date?: string
-          description?: string
-          id?: string
-          image_url?: string
-          location?: string
-          title?: string
-          total_slots?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "events_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      registration_members: {
-        Row: {
-          created_at: string | null
-          id: string
-          registration_id: string
-          team_member_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          registration_id: string
-          team_member_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          registration_id?: string
-          team_member_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "registration_members_registration_id_fkey"
-            columns: ["registration_id"]
-            isOneToOne: false
-            referencedRelation: "registrations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "registration_members_team_member_id_fkey"
-            columns: ["team_member_id"]
-            isOneToOne: false
-            referencedRelation: "team_members"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      registrations: {
-        Row: {
-          created_at: string | null
-          event_id: string
-          id: string
-          team_name: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          event_id: string
-          id?: string
-          team_name: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          event_id?: string
-          id?: string
-          team_name?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "registrations_event_id_fkey"
-            columns: ["event_id"]
-            isOneToOne: false
-            referencedRelation: "events"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "registrations_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      team_members: {
-        Row: {
-          created_at: string | null
-          department: string
-          email: string
-          id: string
-          name: string
-        }
-        Insert: {
-          created_at?: string | null
-          department: string
-          email: string
-          id?: string
-          name: string
-        }
-        Update: {
-          created_at?: string | null
-          department?: string
-          email?: string
-          id?: string
-          name?: string
-        }
-        Relationships: []
-      }
-      users: {
-        Row: {
-          created_at: string | null
-          email: string
-          id: string
-          name: string
-          role: string
-        }
-        Insert: {
-          created_at?: string | null
-          email: string
-          id?: string
-          name: string
-          role: string
-        }
-        Update: {
-          created_at?: string | null
-          email?: string
-          id?: string
-          name?: string
-          role?: string
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      register_for_event: {
-        Args: { p_event_id: string; p_team_name: string; p_team_members: Json }
-        Returns: string
-      }
+      [_ in never]: never
     }
     Enums: {
-      UserRole: "STUDENT" | "ADMIN"
+      [_ in never]: never
     }
     CompositeTypes: {
       [_ in never]: never
@@ -305,8 +133,6 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {
-      UserRole: ["STUDENT", "ADMIN"],
-    },
+    Enums: {},
   },
 } as const
