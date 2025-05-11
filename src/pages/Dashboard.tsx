@@ -24,63 +24,83 @@ const Dashboard = () => {
         return;
       }
       
-      // Fetch user profile from users table
-      const { data: userRecord, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', authUser.user.id)
-        .single();
-      
-      if (error) {
-        console.error("Error fetching user:", error);
+      // Try to fetch user profile from users table
+      try {
+        const { data: userRecord, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', authUser.user.id)
+          .single();
         
-        // If no user record found, create one using the auth user metadata
-        if (error.code === "PGRST116") {
-          const { email, user_metadata } = authUser.user;
+        if (error) {
+          console.error("Error fetching user:", error);
           
-          const newUser: User = {
-            id: authUser.user.id,
-            email: email || '',
-            name: user_metadata?.name || 'New User',
-            role: (user_metadata?.role as UserRole) || 'student',
-            department: user_metadata?.department || ''
-          };
-          
-          // Insert the new user record
-          const { error: insertError } = await supabase
-            .from('users')
-            .insert([{
-              id: newUser.id,
-              name: newUser.name,
-              role: newUser.role,
-              department: newUser.department
-            }]);
+          // If no user record found, use the auth user metadata directly
+          if (error.code === "PGRST116") {
+            const { email, user_metadata } = authUser.user;
             
-          if (insertError) {
-            console.error("Error creating user record:", insertError);
-            toast.error("Failed to create user profile");
+            // Create a user object from auth data without trying to insert into database
+            const newUser: User = {
+              id: authUser.user.id,
+              email: email || '',
+              name: user_metadata?.name || 'New User',
+              role: (user_metadata?.role as UserRole) || 'student',
+              department: user_metadata?.department || ''
+            };
+            
+            // Set user state with data from auth
+            setUser(newUser);
+            setUserRole(newUser.role);
+            
+            // Show a warning but allow the user to proceed
+            toast.warning("Using temporary profile. Some features may be limited.");
             return;
           }
           
-          setUser(newUser);
-          setUserRole(newUser.role);
+          // For other errors, show error but continue with default values
+          toast.error("Failed to load profile. Using default settings.");
+          
+          // Create a minimal user object with default values
+          const defaultUser: User = {
+            id: authUser.user.id,
+            email: authUser.user.email || '',
+            name: 'User',
+            role: 'student',
+            department: ''
+          };
+          
+          setUser(defaultUser);
+          setUserRole('student');
           return;
         }
         
-        return;
+        // Create a user object compatible with our app
+        const appUser: User = {
+          id: authUser.user.id,
+          email: authUser.user.email || '',
+          name: userRecord.name,
+          role: userRecord.role as UserRole,
+          department: userRecord.department
+        };
+        
+        setUser(appUser);
+        setUserRole(userRecord.role as UserRole);
+      } catch (error) {
+        console.error("Unexpected error:", error);
+        toast.error("Something went wrong. Please try again later.");
+        
+        // Create a minimal user object with default values
+        const defaultUser: User = {
+          id: authUser.user.id,
+          email: authUser.user.email || '',
+          name: 'User',
+          role: 'student',
+          department: ''
+        };
+        
+        setUser(defaultUser);
+        setUserRole('student');
       }
-      
-      // Create a user object compatible with our app
-      const appUser: User = {
-        id: authUser.user.id,
-        email: authUser.user.email || '',
-        name: userRecord.name,
-        role: userRecord.role as UserRole,
-        department: userRecord.department
-      };
-      
-      setUser(appUser);
-      setUserRole(userRecord.role as UserRole);
     };
     
     fetchUserProfile();
