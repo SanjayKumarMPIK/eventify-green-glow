@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ODLetterGenerator } from "./ODLetterGenerator";
-import { Event, Registration, User } from "@/types";
+import { Event, Registration, User, UserRole, TeamMember } from "@/types";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FileIcon, Download } from "lucide-react";
