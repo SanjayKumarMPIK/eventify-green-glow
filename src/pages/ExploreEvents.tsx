@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { EventCard } from "@/components/EventCard";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -10,15 +10,17 @@ import { User, TeamMember, Event } from "@/types";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { Layout } from "@/components/Layout";
 
 const ExploreEvents = () => {
   const navigate = useNavigate();
-  const { user: authUser, signOut } = useAuth();
+  const { user: authUser } = useAuth();
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [teamName, setTeamName] = useState("");
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   
   useEffect(() => {
     if (!authUser) {
@@ -27,6 +29,7 @@ const ExploreEvents = () => {
     }
     
     const fetchUserAndEvents = async () => {
+      setLoading(true);
       try {
         // Fetch user details
         const { data: userData, error: userError } = await supabase
@@ -87,19 +90,63 @@ const ExploreEvents = () => {
       } catch (error) {
         console.error("Error fetching data:", error);
         toast.error("Failed to load events");
+      } finally {
+        setLoading(false);
       }
     };
     
     fetchUserAndEvents();
+
+    // Set up real-time listener for available slots updates
+    const channel = supabase
+      .channel('events-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'events'
+        },
+        (payload) => {
+          console.log('Real-time event update:', payload);
+          const updatedEvent = payload.new;
+          
+          // Update the events array with the new data
+          setEvents(prevEvents => prevEvents.map(event =>
+            event.id === updatedEvent.id
+              ? {
+                  ...event,
+                  availableSlots: updatedEvent.available_slots,
+                  totalSlots: updatedEvent.total_slots,
+                }
+              : event
+          ));
+        }
+      )
+      .subscribe();
+
+    return () => {
+      // Clean up the subscription when the component unmounts
+      supabase.removeChannel(channel);
+    };
   }, [authUser, navigate]);
   
-  const handleLogout = () => {
-    signOut();
-  };
-
   const handleRegister = async (eventId: string) => {
     if (!authUser) {
       toast.error("You must be logged in to register");
+      return;
+    }
+    
+    // Find the event
+    const event = events.find(e => e.id === eventId);
+    if (!event) {
+      toast.error("Event not found");
+      return;
+    }
+    
+    // Check if there are available slots
+    if (event.availableSlots <= 0) {
+      toast.error("Sorry, this event is fully booked");
       return;
     }
     
@@ -160,6 +207,19 @@ const ExploreEvents = () => {
     if (!authUser || !selectedEventId) return;
     
     try {
+      // Find the event
+      const event = events.find(e => e.id === selectedEventId);
+      if (!event) {
+        toast.error("Event not found");
+        return;
+      }
+      
+      // Double-check available slots (defensive programming)
+      if (event.availableSlots <= 0) {
+        toast.error("Sorry, this event is fully booked");
+        return;
+      }
+      
       // Insert registration
       const finalTeamName = teamName || `${teamMembers[0].name}'s Team`;
       
@@ -195,14 +255,8 @@ const ExploreEvents = () => {
         throw teamError;
       }
       
-      // Update the UI by decrementing the available slots
-      setEvents(prev => 
-        prev.map(event => 
-          event.id === selectedEventId 
-            ? { ...event, availableSlots: Math.max(0, event.availableSlots - 1) } 
-            : event
-        )
-      );
+      // We rely on the database trigger to update available slots
+      // The UI will be updated via the real-time subscription
       
       setSelectedEventId(null);
       setTeamName("");
@@ -221,44 +275,29 @@ const ExploreEvents = () => {
   };
 
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center">
-          <div className="mr-4 flex">
-            <Link to="/" className="flex items-center space-x-2">
-              <span className="font-bold text-xl text-primary">Eventify</span>
-            </Link>
-          </div>
-          <div className="flex flex-1 items-center justify-end space-x-2">
-            <nav className="flex items-center space-x-4">
-              <Link to="/dashboard" className="text-sm font-medium">
-                Dashboard
-              </Link>
-              <Link to="/explore" className="text-sm font-medium">
-                Explore Events
-              </Link>
-              <Button variant="outline" onClick={handleLogout}>
-                Logout
-              </Button>
-            </nav>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="flex-1 container py-8">
+    <Layout>
+      <div className="container py-8">
         <h1 className="text-3xl font-bold tracking-tight mb-6">Explore Events</h1>
         
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {events.map((event: Event) => (
-            <EventCard
-              key={event.id}
-              event={event}
-              onRegister={handleRegister}
-            />
-          ))}
-        </div>
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        ) : events.length > 0 ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {events.map((event: Event) => (
+              <EventCard
+                key={event.id}
+                event={event}
+                onRegister={handleRegister}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">No events available at the moment.</p>
+          </div>
+        )}
 
         <Dialog open={!!selectedEventId} onOpenChange={(open) => !open && setSelectedEventId(null)}>
           <DialogContent className="sm:max-w-md">
@@ -338,17 +377,8 @@ const ExploreEvents = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </main>
-
-      {/* Footer */}
-      <footer className="bg-background border-t py-6 md:py-0">
-        <div className="container flex flex-col items-center justify-between gap-4 md:h-16 md:flex-row">
-          <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} Eventify. All rights reserved.
-          </p>
-        </div>
-      </footer>
-    </div>
+      </div>
+    </Layout>
   );
 };
 

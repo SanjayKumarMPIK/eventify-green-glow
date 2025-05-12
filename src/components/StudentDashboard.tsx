@@ -16,6 +16,7 @@ export function StudentDashboard() {
   const [events, setEvents] = useState<Event[]>([]);
   const [showCertificate, setShowCertificate] = useState<Registration | null>(null);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const { user: authUser } = useAuth();
 
   useEffect(() => {
@@ -175,24 +176,64 @@ export function StudentDashboard() {
   };
 
   const downloadCertificate = async () => {
-    if (!showCertificate) return;
+    if (!showCertificate || !authUser) return;
     
     try {
+      setIsGenerating(true);
+      
+      // Create a reference to the certificate content element
+      const certificateContent = document.getElementById('certificate-content');
+      if (!certificateContent) throw new Error("Certificate content not found");
+      
+      // Convert HTML to canvas using html2canvas (simulated here)
+      // In a real implementation, you'd use a library like html2canvas
+      const certificateHtml = certificateContent.outerHTML;
+      const blob = new Blob([certificateHtml], { type: 'text/html' });
+      
+      // Create a file
+      const event = getEventById(showCertificate.eventId);
+      const fileName = `Certificate_${event?.title}_${currentUser?.name}.html`;
+      const file = new File([blob], fileName, { type: 'text/html' });
+      
+      // Upload to Supabase
+      const filePath = `${authUser.id}/${showCertificate.id}_certificate.html`;
+      const { data, error } = await supabase.storage
+        .from('certificates')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+      
+      if (error) throw error;
+      
       // Update certificate_generated flag
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from('registrations')
         .update({ certificate_generated: true })
         .eq('id', showCertificate.id);
         
-      if (error) {
-        throw error;
-      }
+      if (updateError) throw updateError;
+      
+      // Get public URL
+      const { data: publicUrlData } = supabase.storage
+        .from('certificates')
+        .getPublicUrl(filePath);
+      
+      // Create a download link
+      const downloadLink = document.createElement('a');
+      downloadLink.href = publicUrlData.publicUrl;
+      downloadLink.download = fileName;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
       
       toast.success("Certificate downloaded");
       setShowCertificate(null);
     } catch (error) {
-      console.error("Error updating certificate status:", error);
-      toast.error("Failed to update certificate status");
+      console.error("Error generating certificate:", error);
+      toast.error("Failed to generate certificate");
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -255,7 +296,7 @@ export function StudentDashboard() {
           </DialogHeader>
           {showCertificate && (
             <div className="py-4">
-              <div className="border-8 border-double border-primary/20 p-8 bg-[#F2FCE2]/30 text-center">
+              <div id="certificate-content" className="border-8 border-double border-primary/20 p-8 bg-[#F2FCE2]/30 text-center">
                 <h1 className="text-3xl font-bold text-primary mb-6">Certificate of Participation</h1>
                 <p className="text-lg mb-6">This is to certify that</p>
                 <p className="text-2xl font-semibold mb-2">{currentUser?.name}</p>
@@ -284,9 +325,13 @@ export function StudentDashboard() {
                 </div>
               </div>
               <div className="flex justify-end mt-4">
-                <Button onClick={downloadCertificate} className="flex items-center">
+                <Button 
+                  onClick={downloadCertificate} 
+                  className="flex items-center" 
+                  disabled={isGenerating}
+                >
                   <Download className="mr-2 h-4 w-4" />
-                  Download Certificate
+                  {isGenerating ? "Generating..." : "Download Certificate"}
                 </Button>
               </div>
             </div>

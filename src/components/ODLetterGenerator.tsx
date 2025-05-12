@@ -6,6 +6,7 @@ import { FileText, Eye } from "lucide-react";
 import { Event, Registration } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAuth } from "@/context/AuthContext";
 
 interface ODLetterGeneratorProps {
   registration: Registration;
@@ -14,6 +15,8 @@ interface ODLetterGeneratorProps {
 
 export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const { user } = useAuth();
   
   const formatDate = (date: Date | string) => {
     // Ensure we're working with a Date object
@@ -26,7 +29,8 @@ export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProp
     });
   };
   
-  const odLetterContent = `
+  const generateODContent = () => {
+    return `
       Date: ${new Date().toLocaleDateString()}
       
       To Whom It May Concern,
@@ -43,25 +47,69 @@ export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProp
       Event Coordinator
       Eventify Platform
     `;
+  };
 
   const handleGenerateOD = async () => {
+    if (!user) {
+      toast.error("You must be logged in to download OD Letter");
+      return;
+    }
+    
     try {
-      // Update od_letter_generated flag
-      const { error } = await supabase
-        .from('registrations')
-        .update({ od_letter_generated: true })
-        .eq('id', registration.id);
-        
+      setIsGenerating(true);
+      
+      // Generate the OD letter content
+      const odLetterContent = generateODContent();
+      
+      // Create a Blob from the text content
+      const blob = new Blob([odLetterContent], { type: 'text/plain' });
+      
+      // Create a file object
+      const file = new File([blob], `OD_Letter_${event.title}_${registration.teamName}.txt`, { type: 'text/plain' });
+      
+      // Upload to Supabase storage
+      const filePath = `${user.id}/${registration.id}_od_letter.txt`;
+      const { data, error } = await supabase.storage
+        .from('od_letters')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+      
       if (error) {
         throw error;
       }
       
-      console.log("Generated OD Letter Content: ", odLetterContent);
+      // Update od_letter_generated flag
+      const { error: updateError } = await supabase
+        .from('registrations')
+        .update({ od_letter_generated: true })
+        .eq('id', registration.id);
+        
+      if (updateError) {
+        throw updateError;
+      }
+      
+      // Get a downloadable URL
+      const { data: publicUrlData } = supabase.storage
+        .from('od_letters')
+        .getPublicUrl(filePath);
+      
+      // Create a download link
+      const downloadLink = document.createElement('a');
+      downloadLink.href = publicUrlData.publicUrl;
+      downloadLink.download = `OD_Letter_${event.title}_${registration.teamName}.txt`;
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
+      
       toast.success("OD Letter downloaded");
       setIsOpen(false);
     } catch (error) {
-      console.error("Error updating OD letter status:", error);
-      toast.error("Failed to update OD letter status");
+      console.error("Error generating OD letter:", error);
+      toast.error("Failed to generate OD letter");
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -78,15 +126,19 @@ export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProp
             <DialogTitle>On-Duty Letter</DialogTitle>
           </DialogHeader>
           <div className="p-4 border rounded-md bg-white text-sm whitespace-pre-line font-mono">
-            {odLetterContent}
+            {generateODContent()}
           </div>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setIsOpen(false)}>
               Close
             </Button>
-            <Button onClick={handleGenerateOD} className="flex items-center">
+            <Button 
+              onClick={handleGenerateOD} 
+              className="flex items-center"
+              disabled={isGenerating}
+            >
               <FileText className="mr-2 h-4 w-4" />
-              Download
+              {isGenerating ? "Generating..." : "Download"}
             </Button>
           </div>
         </DialogContent>

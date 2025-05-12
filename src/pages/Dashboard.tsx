@@ -1,19 +1,19 @@
 
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 import { User, UserRole } from "@/types";
 import { StudentDashboard } from "@/components/StudentDashboard";
 import { AdminDashboard } from "@/components/AdminDashboard";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Layout } from "@/components/Layout";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<UserRole>("student");
-  const { signOut } = useAuth();
+  const { user: authUser } = useAuth();
   
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -104,44 +104,15 @@ const Dashboard = () => {
     };
     
     fetchUserProfile();
-  }, [navigate]);
-  
-  const handleLogout = async () => {
-    await signOut();
-  };
+  }, [navigate, authUser]);
 
   if (!user) {
     return <div className="flex justify-center items-center min-h-screen">Loading...</div>;
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-14 items-center">
-          <div className="mr-4 flex">
-            <Link to="/" className="flex items-center space-x-2">
-              <span className="font-bold text-xl text-primary">Eventify</span>
-            </Link>
-          </div>
-          <div className="flex flex-1 items-center justify-end space-x-2">
-            <nav className="flex items-center space-x-4">
-              <Link to="/dashboard" className="text-sm font-medium">
-                Dashboard
-              </Link>
-              <Link to="/explore" className="text-sm font-medium">
-                Explore Events
-              </Link>
-              <Button variant="outline" onClick={handleLogout}>
-                Logout
-              </Button>
-            </nav>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="flex-1 container py-8">
+    <Layout>
+      <div className="container py-8">
         <div className="mb-6">
           <h1 className="text-3xl font-bold tracking-tight">
             {userRole === "admin" ? "Admin Dashboard" : "Student Dashboard"}
@@ -158,17 +129,8 @@ const Dashboard = () => {
         ) : (
           <StudentDashboard />
         )}
-      </main>
-
-      {/* Footer */}
-      <footer className="bg-background border-t py-6 md:py-0">
-        <div className="container flex flex-col items-center justify-between gap-4 md:h-16 md:flex-row">
-          <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} Eventify. All rights reserved.
-          </p>
-        </div>
-      </footer>
-    </div>
+      </div>
+    </Layout>
   );
 };
 
