@@ -65,7 +65,8 @@ export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProp
       const blob = new Blob([odLetterContent], { type: 'text/plain' });
       
       // Create a file object
-      const file = new File([blob], `OD_Letter_${event.title}_${registration.teamName}.txt`, { type: 'text/plain' });
+      const fileName = `OD_Letter_${event.title}_${registration.teamName}.txt`;
+      const file = new File([blob], fileName, { type: 'text/plain' });
       
       // Upload to Supabase storage with proper authorization
       const filePath = `${user.id}/${registration.id}_od_letter.txt`;
@@ -92,22 +93,20 @@ export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProp
         throw updateError;
       }
       
-      // Get a downloadable URL
-      const { data: publicUrlData } = supabase.storage
-        .from('od_letters')
-        .getPublicUrl(filePath);
-      
-      if (!publicUrlData.publicUrl) {
-        throw new Error("Could not generate public URL");
-      }
+      // Create a direct download instead of getting a public URL
+      const odLetterBlob = new Blob([odLetterContent], { type: 'text/plain' });
+      const blobUrl = URL.createObjectURL(odLetterBlob);
       
       // Create a download link
       const downloadLink = document.createElement('a');
-      downloadLink.href = publicUrlData.publicUrl;
-      downloadLink.download = `OD_Letter_${event.title}_${registration.teamName}.txt`;
+      downloadLink.href = blobUrl;
+      downloadLink.download = fileName;
       document.body.appendChild(downloadLink);
       downloadLink.click();
       document.body.removeChild(downloadLink);
+      
+      // Clean up the blob URL
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
       
       toast.success("OD Letter downloaded successfully");
       setIsOpen(false);

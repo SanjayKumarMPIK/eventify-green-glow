@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -189,34 +190,51 @@ export function StudentDashboard() {
         throw new Error("Event information not found");
       }
       
-      // Create HTML content for certificate
+      // Create PDF-like content
       const certificateHTML = `
       <!DOCTYPE html>
       <html>
       <head>
+        <meta charset="UTF-8">
         <title>Certificate of Participation</title>
         <style>
+          @page {
+            size: landscape;
+            margin: 0;
+          }
           body {
             font-family: 'Arial', sans-serif;
             text-align: center;
+            color: #333;
             padding: 40px;
-            border: 8px double #4f46e5;
+            border: 20px double #4f46e5;
+            margin: 0;
             background-color: #f9fafb;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 100vh;
+          }
+          .certificate {
+            max-width: 800px;
+            margin: 0 auto;
           }
           h1 {
             color: #4f46e5;
-            font-size: 28px;
+            font-size: 36px;
             margin-bottom: 30px;
           }
           .name {
-            font-size: 24px;
+            font-size: 32px;
             font-weight: bold;
-            margin: 20px 0;
+            margin: 25px 0;
+            color: #000;
           }
           .event {
-            font-size: 24px;
+            font-size: 28px;
             font-weight: bold;
-            margin: 20px 0;
+            margin: 25px 0;
+            color: #333;
           }
           .signatures {
             display: flex;
@@ -229,23 +247,29 @@ export function StudentDashboard() {
             padding-top: 10px;
             display: inline-block;
           }
+          p {
+            font-size: 18px;
+            line-height: 1.6;
+          }
         </style>
       </head>
       <body>
-        <h1>Certificate of Participation</h1>
-        <p>This is to certify that</p>
-        <p class="name">${currentUser.name}</p>
-        <p>from ${currentUser.department || 'Department'}</p>
-        <p>has successfully participated in the event</p>
-        <p class="event">${event.title}</p>
-        <p>held on ${formatDate(event.date)}</p>
-        
-        <div class="signatures">
-          <div>
-            <div class="signature">Event Coordinator</div>
-          </div>
-          <div>
-            <div class="signature">Department Head</div>
+        <div class="certificate">
+          <h1>Certificate of Participation</h1>
+          <p>This is to certify that</p>
+          <p class="name">${currentUser.name}</p>
+          <p>from ${currentUser.department || 'Department'}</p>
+          <p>has successfully participated in the event</p>
+          <p class="event">${event.title}</p>
+          <p>held on ${formatDate(event.date)}</p>
+          
+          <div class="signatures">
+            <div>
+              <div class="signature">Event Coordinator</div>
+            </div>
+            <div>
+              <div class="signature">Department Head</div>
+            </div>
           </div>
         </div>
       </body>
@@ -284,22 +308,20 @@ export function StudentDashboard() {
         throw updateError;
       }
       
-      // Get public URL
-      const { data: publicUrlData } = supabase.storage
-        .from('certificates')
-        .getPublicUrl(filePath);
-      
-      if (!publicUrlData.publicUrl) {
-        throw new Error("Could not generate public URL");
-      }
+      // Create a direct download by creating a blob URL
+      const certificateBlob = new Blob([certificateHTML], { type: 'text/html' });
+      const blobUrl = URL.createObjectURL(certificateBlob);
       
       // Create a download link
       const downloadLink = document.createElement('a');
-      downloadLink.href = publicUrlData.publicUrl;
+      downloadLink.href = blobUrl;
       downloadLink.download = fileName;
       document.body.appendChild(downloadLink);
       downloadLink.click();
       document.body.removeChild(downloadLink);
+      
+      // Clean up the blob URL
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
       
       toast.success("Certificate downloaded successfully");
       setShowCertificate(null);
