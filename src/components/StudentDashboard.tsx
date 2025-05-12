@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -176,26 +175,91 @@ export function StudentDashboard() {
   };
 
   const downloadCertificate = async () => {
-    if (!showCertificate || !authUser) return;
+    if (!showCertificate || !authUser || !currentUser) {
+      toast.error("Missing required information");
+      return;
+    }
     
     try {
       setIsGenerating(true);
       
-      // Create a reference to the certificate content element
-      const certificateContent = document.getElementById('certificate-content');
-      if (!certificateContent) throw new Error("Certificate content not found");
-      
-      // Convert HTML to canvas using html2canvas (simulated here)
-      // In a real implementation, you'd use a library like html2canvas
-      const certificateHtml = certificateContent.outerHTML;
-      const blob = new Blob([certificateHtml], { type: 'text/html' });
-      
-      // Create a file
+      // Get event info
       const event = getEventById(showCertificate.eventId);
-      const fileName = `Certificate_${event?.title}_${currentUser?.name}.html`;
+      if (!event) {
+        throw new Error("Event information not found");
+      }
+      
+      // Create HTML content for certificate
+      const certificateHTML = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Certificate of Participation</title>
+        <style>
+          body {
+            font-family: 'Arial', sans-serif;
+            text-align: center;
+            padding: 40px;
+            border: 8px double #4f46e5;
+            background-color: #f9fafb;
+          }
+          h1 {
+            color: #4f46e5;
+            font-size: 28px;
+            margin-bottom: 30px;
+          }
+          .name {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 20px 0;
+          }
+          .event {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 20px 0;
+          }
+          .signatures {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 100px;
+          }
+          .signature {
+            border-top: 1px solid #000;
+            width: 200px;
+            padding-top: 10px;
+            display: inline-block;
+          }
+        </style>
+      </head>
+      <body>
+        <h1>Certificate of Participation</h1>
+        <p>This is to certify that</p>
+        <p class="name">${currentUser.name}</p>
+        <p>from ${currentUser.department || 'Department'}</p>
+        <p>has successfully participated in the event</p>
+        <p class="event">${event.title}</p>
+        <p>held on ${formatDate(event.date)}</p>
+        
+        <div class="signatures">
+          <div>
+            <div class="signature">Event Coordinator</div>
+          </div>
+          <div>
+            <div class="signature">Department Head</div>
+          </div>
+        </div>
+      </body>
+      </html>
+      `;
+      
+      // Create a Blob from the HTML content
+      const blob = new Blob([certificateHTML], { type: 'text/html' });
+      
+      // Create a file object
+      const fileName = `Certificate_${event.title}_${currentUser.name}.html`;
       const file = new File([blob], fileName, { type: 'text/html' });
       
-      // Upload to Supabase
+      // Upload to Supabase with proper authorization
       const filePath = `${authUser.id}/${showCertificate.id}_certificate.html`;
       const { data, error } = await supabase.storage
         .from('certificates')
@@ -204,7 +268,10 @@ export function StudentDashboard() {
           upsert: true
         });
       
-      if (error) throw error;
+      if (error) {
+        console.error("Storage upload error:", error);
+        throw error;
+      }
       
       // Update certificate_generated flag
       const { error: updateError } = await supabase
@@ -212,12 +279,19 @@ export function StudentDashboard() {
         .update({ certificate_generated: true })
         .eq('id', showCertificate.id);
         
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error("Registration update error:", updateError);
+        throw updateError;
+      }
       
       // Get public URL
       const { data: publicUrlData } = supabase.storage
         .from('certificates')
         .getPublicUrl(filePath);
+      
+      if (!publicUrlData.publicUrl) {
+        throw new Error("Could not generate public URL");
+      }
       
       // Create a download link
       const downloadLink = document.createElement('a');
@@ -227,16 +301,17 @@ export function StudentDashboard() {
       downloadLink.click();
       document.body.removeChild(downloadLink);
       
-      toast.success("Certificate downloaded");
+      toast.success("Certificate downloaded successfully");
       setShowCertificate(null);
     } catch (error) {
       console.error("Error generating certificate:", error);
-      toast.error("Failed to generate certificate");
+      toast.error("Failed to generate certificate. Please try again later.");
     } finally {
       setIsGenerating(false);
     }
   };
 
+  
   return (
     <div className="space-y-6">
       <section className="space-y-3">

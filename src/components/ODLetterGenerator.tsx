@@ -67,7 +67,7 @@ export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProp
       // Create a file object
       const file = new File([blob], `OD_Letter_${event.title}_${registration.teamName}.txt`, { type: 'text/plain' });
       
-      // Upload to Supabase storage
+      // Upload to Supabase storage with proper authorization
       const filePath = `${user.id}/${registration.id}_od_letter.txt`;
       const { data, error } = await supabase.storage
         .from('od_letters')
@@ -77,6 +77,7 @@ export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProp
         });
       
       if (error) {
+        console.error("Storage upload error:", error);
         throw error;
       }
       
@@ -87,6 +88,7 @@ export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProp
         .eq('id', registration.id);
         
       if (updateError) {
+        console.error("Registration update error:", updateError);
         throw updateError;
       }
       
@@ -94,6 +96,10 @@ export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProp
       const { data: publicUrlData } = supabase.storage
         .from('od_letters')
         .getPublicUrl(filePath);
+      
+      if (!publicUrlData.publicUrl) {
+        throw new Error("Could not generate public URL");
+      }
       
       // Create a download link
       const downloadLink = document.createElement('a');
@@ -103,11 +109,11 @@ export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProp
       downloadLink.click();
       document.body.removeChild(downloadLink);
       
-      toast.success("OD Letter downloaded");
+      toast.success("OD Letter downloaded successfully");
       setIsOpen(false);
     } catch (error) {
       console.error("Error generating OD letter:", error);
-      toast.error("Failed to generate OD letter");
+      toast.error("Failed to generate OD letter. Please try again later.");
     } finally {
       setIsGenerating(false);
     }
