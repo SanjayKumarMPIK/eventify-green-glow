@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useState, useEffect } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
-import { User } from "@/types";
+import { User, UserRole } from "@/types";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -34,7 +34,7 @@ export function Layout({ children }: LayoutProps) {
             id: authUser.id,
             email: authUser.email || '',
             name: authUser.user_metadata?.name || 'User',
-            role: (authUser.user_metadata?.role as any) || 'student',
+            role: (authUser.user_metadata?.role as UserRole) || 'student',
             department: authUser.user_metadata?.department || ''
           });
           return;
@@ -44,7 +44,7 @@ export function Layout({ children }: LayoutProps) {
           id: data.id,
           email: authUser.email || '',
           name: data.name,
-          role: data.role,
+          role: data.role as UserRole,
           department: data.department || ''
         });
       } catch (error) {
