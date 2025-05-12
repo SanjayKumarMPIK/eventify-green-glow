@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -190,7 +189,7 @@ export function StudentDashboard() {
         throw new Error("Event information not found");
       }
       
-      // Create PDF-like content
+      // Create PDF-like content using HTML
       const certificateHTML = `
       <!DOCTYPE html>
       <html>
@@ -276,14 +275,14 @@ export function StudentDashboard() {
       </html>
       `;
       
-      // Create a Blob from the HTML content
+      // Convert HTML to a Blob
       const blob = new Blob([certificateHTML], { type: 'text/html' });
       
       // Create a file object
       const fileName = `Certificate_${event.title}_${currentUser.name}.html`;
       const file = new File([blob], fileName, { type: 'text/html' });
       
-      // Upload to Supabase with proper authorization
+      // Upload to Supabase storage
       const filePath = `${authUser.id}/${showCertificate.id}_certificate.html`;
       const { data, error } = await supabase.storage
         .from('certificates')
@@ -308,22 +307,20 @@ export function StudentDashboard() {
         throw updateError;
       }
       
-      // Create a direct download by creating a blob URL
-      const certificateBlob = new Blob([certificateHTML], { type: 'text/html' });
-      const blobUrl = URL.createObjectURL(certificateBlob);
+      // Get the public URL of the uploaded file
+      const { data: publicUrlData } = supabase
+        .storage
+        .from('certificates')
+        .getPublicUrl(filePath);
       
-      // Create a download link
-      const downloadLink = document.createElement('a');
-      downloadLink.href = blobUrl;
-      downloadLink.download = fileName;
-      document.body.appendChild(downloadLink);
-      downloadLink.click();
-      document.body.removeChild(downloadLink);
+      if (!publicUrlData.publicUrl) {
+        throw new Error("Could not generate public URL for certificate");
+      }
       
-      // Clean up the blob URL
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+      // Open the certificate in a new tab to display it properly
+      window.open(publicUrlData.publicUrl, '_blank');
       
-      toast.success("Certificate downloaded successfully");
+      toast.success("Certificate generated successfully");
       setShowCertificate(null);
     } catch (error) {
       console.error("Error generating certificate:", error);
