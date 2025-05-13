@@ -18,4 +18,9 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
       'x-application-name': 'eventify',
     },
   },
+  realtime: {
+    params: {
+      eventsPerSecond: 10
+    }
+  }
 });

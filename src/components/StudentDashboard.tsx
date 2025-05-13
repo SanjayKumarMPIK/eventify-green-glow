@@ -146,6 +146,37 @@ export function StudentDashboard() {
         
         setMyRegistrations(processedRegistrations);
         setEvents(Object.values(eventsMap));
+        
+        // Set up real-time listener for event slot updates
+        const eventChannel = supabase
+          .channel('event-updates')
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'events'
+            },
+            (payload) => {
+              console.log('Event update received:', payload);
+              const updatedEvent = payload.new;
+              setEvents(prevEvents => prevEvents.map(event => 
+                event.id === updatedEvent.id ? 
+                {
+                  ...event,
+                  availableSlots: updatedEvent.available_slots,
+                  totalSlots: updatedEvent.total_slots
+                } : 
+                event
+              ));
+            }
+          )
+          .subscribe();
+        
+        // Return cleanup function for the channel
+        return () => {
+          supabase.removeChannel(eventChannel);
+        };
       } catch (error) {
         console.error("Unexpected error:", error);
         toast.error("Something went wrong. Please try again later.");
@@ -189,7 +220,7 @@ export function StudentDashboard() {
         throw new Error("Event information not found");
       }
       
-      // Create PDF-like content using HTML
+      // Create PDF-like content using HTML with proper styling
       const certificateHTML = `
       <!DOCTYPE html>
       <html>
@@ -307,20 +338,22 @@ export function StudentDashboard() {
         throw updateError;
       }
       
-      // Get the public URL of the uploaded file
-      const { data: publicUrlData } = supabase
-        .storage
-        .from('certificates')
-        .getPublicUrl(filePath);
+      // Download using a temporary link element
+      const downloadLink = document.createElement('a');
       
-      if (!publicUrlData.publicUrl) {
-        throw new Error("Could not generate public URL for certificate");
-      }
+      // Generate a downloadable object URL from the blob directly
+      const blobUrl = URL.createObjectURL(blob);
+      downloadLink.href = blobUrl;
+      downloadLink.download = fileName;
+      downloadLink.target = "_blank";
+      document.body.appendChild(downloadLink);
+      downloadLink.click();
+      document.body.removeChild(downloadLink);
       
-      // Open the certificate in a new tab to display it properly
-      window.open(publicUrlData.publicUrl, '_blank');
+      // Clean up the object URL
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
       
-      toast.success("Certificate generated successfully");
+      toast.success("Certificate downloaded successfully");
       setShowCertificate(null);
     } catch (error) {
       console.error("Error generating certificate:", error);

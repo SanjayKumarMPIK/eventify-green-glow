@@ -93,24 +93,19 @@ export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProp
         throw updateError;
       }
       
-      // Get the public URL of the uploaded file
-      const { data: publicUrlData } = supabase
-        .storage
-        .from('od_letters')
-        .getPublicUrl(filePath);
-      
-      if (!publicUrlData.publicUrl) {
-        throw new Error("Could not generate public URL for OD letter");
-      }
+      // Create a direct download by creating a blob URL
+      const blobUrl = URL.createObjectURL(blob);
       
       // Create a download link
       const downloadLink = document.createElement('a');
-      downloadLink.href = publicUrlData.publicUrl;
-      downloadLink.target = "_blank";
+      downloadLink.href = blobUrl;
       downloadLink.download = fileName;
       document.body.appendChild(downloadLink);
       downloadLink.click();
       document.body.removeChild(downloadLink);
+      
+      // Clean up the blob URL
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
       
       toast.success("OD Letter downloaded successfully");
       setIsOpen(false);
