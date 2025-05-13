@@ -21,6 +21,7 @@ const ExploreEvents = () => {
   const [events, setEvents] = useState<Event[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userRegistrations, setUserRegistrations] = useState<string[]>([]);
   
   useEffect(() => {
     if (!authUser) {
@@ -61,6 +62,18 @@ const ExploreEvents = () => {
           };
           
           setCurrentUser(user);
+        }
+        
+        // Fetch user's registrations to prevent double registrations
+        const { data: registrationsData, error: registrationsError } = await supabase
+          .from('registrations')
+          .select('event_id')
+          .eq('user_id', authUser.id);
+          
+        if (registrationsError) {
+          console.error("Error fetching registrations:", registrationsError);
+        } else {
+          setUserRegistrations(registrationsData.map(reg => reg.event_id));
         }
         
         // Fetch events
@@ -137,6 +150,12 @@ const ExploreEvents = () => {
       return;
     }
     
+    // Check if user already registered for this event
+    if (userRegistrations.includes(eventId)) {
+      toast.error("You have already registered for this event");
+      return;
+    }
+    
     // Find the event
     const event = events.find(e => e.id === eventId);
     if (!event) {
@@ -144,44 +163,38 @@ const ExploreEvents = () => {
       return;
     }
     
-    // Check if there are available slots
-    if (event.availableSlots <= 0) {
-      toast.error("Sorry, this event is fully booked");
-      return;
-    }
-    
-    // Check if user has already registered for this event
+    // Perform a fresh check of available slots directly from the database
     try {
-      const { data, error } = await supabase
-        .from('registrations')
-        .select('id')
-        .eq('event_id', eventId)
-        .eq('user_id', authUser.id);
+      const { data: eventData, error: eventError } = await supabase
+        .from('events')
+        .select('available_slots')
+        .eq('id', eventId)
+        .single();
         
-      if (error) {
-        throw error;
+      if (eventError) {
+        throw eventError;
       }
       
-      if (data && data.length > 0) {
-        toast.error("You have already registered for this event");
+      // Check if there are available slots based on fresh data
+      if (eventData.available_slots <= 0) {
+        toast.error("Sorry, this event is fully booked");
         return;
       }
+      
+      setSelectedEventId(eventId);
+      
+      // Initialize with the current user's details
+      if (currentUser) {
+        setTeamName("");
+        setTeamMembers([{
+          name: currentUser.name,
+          email: currentUser.email,
+          department: currentUser.department || ""
+        }]);
+      }
     } catch (error) {
-      console.error("Error checking registration:", error);
-      toast.error("Failed to check registration status");
-      return;
-    }
-    
-    setSelectedEventId(eventId);
-    
-    // Initialize with the current user's details
-    if (currentUser) {
-      setTeamName("");
-      setTeamMembers([{
-        name: currentUser.name,
-        email: currentUser.email,
-        department: currentUser.department || ""
-      }]);
+      console.error("Error checking event availability:", error);
+      toast.error("Failed to check event availability");
     }
   };
 
@@ -207,20 +220,31 @@ const ExploreEvents = () => {
     if (!authUser || !selectedEventId) return;
     
     try {
-      // Find the event
-      const event = events.find(e => e.id === selectedEventId);
-      if (!event) {
-        toast.error("Event not found");
+      // Final verification that user hasn't registered already
+      if (userRegistrations.includes(selectedEventId)) {
+        toast.error("You have already registered for this event");
+        setSelectedEventId(null);
         return;
       }
       
-      // Double-check available slots (defensive programming)
-      if (event.availableSlots <= 0) {
+      // Final check of available slots directly from the database
+      const { data: eventData, error: eventError } = await supabase
+        .from('events')
+        .select('available_slots')
+        .eq('id', selectedEventId)
+        .single();
+        
+      if (eventError) {
+        throw eventError;
+      }
+      
+      if (eventData.available_slots <= 0) {
         toast.error("Sorry, this event is fully booked");
+        setSelectedEventId(null);
         return;
       }
       
-      // Insert registration
+      // Insert registration - the database trigger will handle slot decrement
       const finalTeamName = teamName || `${teamMembers[0].name}'s Team`;
       
       const { data: regData, error: regError } = await supabase
@@ -233,7 +257,15 @@ const ExploreEvents = () => {
         .select();
         
       if (regError) {
-        throw regError;
+        // If error contains message about slots or registration, display it
+        if (regError.message?.includes("No available slots") || 
+            regError.message?.includes("User has already registered")) {
+          toast.error(regError.message);
+        } else {
+          throw regError;
+        }
+        setSelectedEventId(null);
+        return;
       }
       
       const registrationId = regData[0].id;
@@ -255,9 +287,10 @@ const ExploreEvents = () => {
         throw teamError;
       }
       
-      // We rely on the database trigger to update available slots
-      // The UI will be updated via the real-time subscription
+      // Update local user registrations to prevent double registrations
+      setUserRegistrations(prev => [...prev, selectedEventId]);
       
+      // Close the dialog and reset form
       setSelectedEventId(null);
       setTeamName("");
       setTeamMembers([]);
@@ -271,6 +304,7 @@ const ExploreEvents = () => {
       } else {
         toast.error("Failed to register for the event");
       }
+      setSelectedEventId(null);
     }
   };
 
@@ -290,6 +324,7 @@ const ExploreEvents = () => {
                 key={event.id}
                 event={event}
                 onRegister={handleRegister}
+                isRegistered={userRegistrations.includes(event.id)}
               />
             ))}
           </div>

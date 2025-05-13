@@ -1,12 +1,12 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Event } from "@/types";
-import { CalendarIcon, MapPinIcon, UsersIcon } from "lucide-react";
+import { CalendarIcon, MapPinIcon, UsersIcon, CheckCircle } from "lucide-react";
 
 interface EventCardProps {
   event: Event;
   isAdmin?: boolean;
+  isRegistered?: boolean;
   onRegister?: (eventId: string) => void;
   onEdit?: (eventId: string) => void;
   onDelete?: (eventId: string) => void;
@@ -17,6 +17,7 @@ interface EventCardProps {
 export function EventCard({
   event,
   isAdmin = false,
+  isRegistered = false,
   onRegister,
   onEdit,
   onDelete,
@@ -98,6 +99,15 @@ export function EventCard({
               Add Slots
             </Button>
           </>
+        ) : isRegistered ? (
+          <Button 
+            variant="outline"
+            className="w-full flex items-center justify-center cursor-default"
+            disabled
+          >
+            <CheckCircle className="mr-2 h-4 w-4 text-green-500" />
+            Already Registered
+          </Button>
         ) : (
           <Button 
             onClick={() => onRegister && onRegister(event.id)}
