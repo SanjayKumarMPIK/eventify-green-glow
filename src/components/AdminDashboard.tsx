@@ -11,13 +11,16 @@ import { Event, Registration, TeamMember } from "@/types";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { RegistrationsView } from "./RegistrationsView";
+import { EventFeedbackList } from "./EventFeedbackList";
 
 export function AdminDashboard() {
   const [events, setEvents] = useState<Event[]>([]);
   const [isAddEventOpen, setIsAddEventOpen] = useState(false);
   const [isViewRegistrationsOpen, setIsViewRegistrationsOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-  const [registrations, setRegistrations] = useState<Registration[]>([]);
+  const [activeTab, setActiveTab] = useState("events");
   const [eventTitle, setEventTitle] = useState("");
   const [eventDescription, setEventDescription] = useState("");
   const [eventDate, setEventDate] = useState("");
@@ -58,71 +61,6 @@ export function AdminDashboard() {
     } catch (error) {
       console.error("Error fetching events:", error);
       toast.error("Failed to load events");
-    }
-  };
-
-  const fetchRegistrationsForEvent = async (eventId: string) => {
-    try {
-      // Get registrations for the event
-      const { data: registrationData, error: registrationError } = await supabase
-        .from('registrations')
-        .select('*')
-        .eq('event_id', eventId);
-        
-      if (registrationError) {
-        throw registrationError;
-      }
-      
-      // Get team members for these registrations
-      const registrationIds = registrationData.map(reg => reg.id);
-      
-      if (registrationIds.length === 0) {
-        setRegistrations([]);
-        return [];
-      }
-      
-      const { data: teamMembersData, error: teamMembersError } = await supabase
-        .from('team_members')
-        .select('*')
-        .in('registration_id', registrationIds);
-        
-      if (teamMembersError) {
-        throw teamMembersError;
-      }
-      
-      // Organize team members by registration
-      const teamMembersByRegistration = teamMembersData.reduce((acc, member) => {
-        if (!acc[member.registration_id]) {
-          acc[member.registration_id] = [];
-        }
-        acc[member.registration_id].push({
-          name: member.name,
-          email: member.email,
-          department: member.department,
-          roll_number: member.roll_number
-        });
-        return acc;
-      }, {} as Record<string, TeamMember[]>);
-      
-      // Create final registration objects
-      const processedRegistrations = registrationData.map(reg => ({
-        id: reg.id,
-        eventId: reg.event_id,
-        userId: reg.user_id,
-        teamName: reg.team_name,
-        registrationDate: new Date(reg.registration_date),
-        attended: reg.attended,
-        certificate_generated: reg.certificate_generated,
-        od_letter_generated: reg.od_letter_generated,
-        teamMembers: teamMembersByRegistration[reg.id] || []
-      }));
-      
-      setRegistrations(processedRegistrations);
-      return processedRegistrations;
-    } catch (error) {
-      console.error("Error fetching registrations:", error);
-      toast.error("Failed to load registrations");
-      return [];
     }
   };
 
@@ -266,7 +204,6 @@ export function AdminDashboard() {
     if (!event) return;
 
     setSelectedEvent(event);
-    await fetchRegistrationsForEvent(eventId);
     setIsViewRegistrationsOpen(true);
   };
 
@@ -328,29 +265,42 @@ export function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold tracking-tight">Manage Events</h2>
-        <Button onClick={() => {
-          resetEventForm();
-          setIsAddEventOpen(true);
-        }}>
-          Add New Event
-        </Button>
-      </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="mb-4">
+          <TabsTrigger value="events">Manage Events</TabsTrigger>
+          <TabsTrigger value="feedbacks">Feedbacks</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="events" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold tracking-tight">Manage Events</h2>
+            <Button onClick={() => {
+              resetEventForm();
+              setIsAddEventOpen(true);
+            }}>
+              Add New Event
+            </Button>
+          </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {events.map((event) => (
-          <EventCard
-            key={event.id}
-            event={event}
-            isAdmin={true}
-            onEdit={handleEditEvent}
-            onDelete={handleDeleteEvent}
-            onViewRegistrations={handleViewRegistrations}
-            onIncrementSlots={handleIncrementSlots}
-          />
-        ))}
-      </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {events.map((event) => (
+              <EventCard
+                key={event.id}
+                event={event}
+                isAdmin={true}
+                onEdit={handleEditEvent}
+                onDelete={handleDeleteEvent}
+                onViewRegistrations={handleViewRegistrations}
+                onIncrementSlots={handleIncrementSlots}
+              />
+            ))}
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="feedbacks">
+          <EventFeedbackList />
+        </TabsContent>
+      </Tabs>
 
       {/* Add/Edit Event Dialog */}
       <Dialog open={isAddEventOpen} onOpenChange={setIsAddEventOpen}>
@@ -436,7 +386,7 @@ export function AdminDashboard() {
 
       {/* View Registrations Dialog */}
       <Dialog open={isViewRegistrationsOpen} onOpenChange={setIsViewRegistrationsOpen}>
-        <DialogContent className="sm:max-w-[600px]">
+        <DialogContent className="sm:max-w-[90%] max-h-[90vh] overflow-auto">
           <DialogHeader>
             <DialogTitle>Registrations for {selectedEvent?.title}</DialogTitle>
             <DialogDescription>
@@ -444,41 +394,8 @@ export function AdminDashboard() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            {registrations.length > 0 ? (
-              registrations.map((registration) => (
-                <Card key={registration.id} className="mb-4">
-                  <CardHeader>
-                    <CardTitle className="text-lg">Team: {registration.teamName}</CardTitle>
-                    <CardDescription>
-                      Registered on {formatDate(registration.registrationDate)}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <h4 className="font-medium mb-2">Team Members</h4>
-                    <div className="space-y-2">
-                      {registration.teamMembers.map((member, index) => (
-                        <div key={index} className="border p-2 rounded text-sm">
-                          <p><strong>Name:</strong> {member.name}</p>
-                          <p><strong>Email:</strong> {member.email}</p>
-                          <p><strong>Department:</strong> {member.department}</p>
-                          {member.roll_number && (
-                            <p><strong>Roll Number:</strong> {member.roll_number}</p>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            ) : (
-              <p className="text-center text-muted-foreground py-4">No registrations for this event yet.</p>
-            )}
+            {selectedEvent && <RegistrationsView event={selectedEvent} />}
           </div>
-          <DialogFooter>
-            <Button onClick={() => setIsViewRegistrationsOpen(false)}>
-              Close
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

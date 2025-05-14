@@ -163,104 +163,9 @@ export function RegistrationsView({ event }: RegistrationsViewProps) {
     });
   };
 
-  // Render for larger screens
-  const renderDesktopView = () => (
-    <div className="border rounded-md hidden md:block">
-      <div className="bg-muted py-2 px-4 grid grid-cols-12 gap-2 text-sm font-medium">
-        <div className="col-span-3">Team Name</div>
-        <div className="col-span-6">Members</div>
-        <div className="col-span-2">Registered On</div>
-        <div className="col-span-1 text-center">Attended</div>
-      </div>
-      
-      <ScrollArea className="h-[calc(100vh-330px)] min-h-[300px]">
-        <div className="divide-y">
-          {filteredRegistrations.map((registration) => (
-            <div key={registration.id} className="py-3 px-4 grid grid-cols-12 gap-2 items-center">
-              <div className="col-span-3 font-medium">{registration.teamName}</div>
-              <div className="col-span-6">
-                <div className="space-y-1">
-                  {registration.teamMembers.map((member, index) => (
-                    <div key={index} className="text-sm">
-                      <div className="font-medium">{member.name}</div>
-                      <div className="text-muted-foreground text-xs">
-                        {member.email} • {member.department} {member.roll_number && `• ${member.roll_number}`}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="col-span-2 text-sm text-muted-foreground">
-                {formatDate(registration.registrationDate)}
-              </div>
-              <div className="col-span-1 flex justify-center">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={`h-8 w-8 ${registration.attended ? 'bg-green-100 text-green-700' : 'text-muted-foreground'}`}
-                  onClick={() => handleAttendanceToggle(registration)}
-                >
-                  {registration.attended && <CheckIcon className="h-4 w-4" />}
-                  {!registration.attended && <Checkbox className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </ScrollArea>
-    </div>
-  );
-
-  // Render for mobile/smaller screens
-  const renderMobileView = () => (
-    <div className="md:hidden space-y-4">
-      <ScrollArea className="h-[calc(100vh-330px)] min-h-[300px]">
-        {filteredRegistrations.map((registration) => (
-          <div key={registration.id} className="border rounded-md p-4 mb-4">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="font-medium">{registration.teamName}</h3>
-              <Button
-                variant="ghost"
-                size="sm"
-                className={`${registration.attended ? 'text-green-700' : 'text-muted-foreground'}`}
-                onClick={() => handleAttendanceToggle(registration)}
-              >
-                {registration.attended ? (
-                  <CheckCircle2 className="h-5 w-5 mr-1" />
-                ) : (
-                  <Circle className="h-5 w-5 mr-1" />
-                )}
-                {registration.attended ? 'Attended' : 'Mark Attendance'}
-              </Button>
-            </div>
-            
-            <div className="text-xs text-muted-foreground mb-2">
-              Registered on {formatDate(registration.registrationDate)}
-            </div>
-            
-            <div className="border-t pt-2 mt-2">
-              <div className="text-sm font-medium mb-1">Team Members:</div>
-              {registration.teamMembers.map((member, index) => (
-                <div key={index} className="text-sm mb-2 pl-2 border-l-2 border-muted">
-                  <div className="font-medium">{member.name}</div>
-                  <div className="text-muted-foreground text-xs">
-                    {member.email}
-                  </div>
-                  <div className="text-muted-foreground text-xs">
-                    {member.department} {member.roll_number && `• ${member.roll_number}`}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </ScrollArea>
-    </div>
-  );
-
   return (
     <div className="space-y-4">
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-2 mb-4">
         <div className="relative flex-1">
           <SearchIcon className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -280,10 +185,50 @@ export function RegistrationsView({ event }: RegistrationsViewProps) {
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
       ) : registrations.length > 0 ? (
-        <>
-          {renderDesktopView()}
-          {renderMobileView()}
-        </>
+        <div className="w-full overflow-auto">
+          <Table className="min-w-full">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[200px]">Team Name</TableHead>
+                <TableHead>Members</TableHead>
+                <TableHead className="w-[150px]">Registered On</TableHead>
+                <TableHead className="w-[100px] text-center">Attended</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredRegistrations.map((registration) => (
+                <TableRow key={registration.id}>
+                  <TableCell className="font-medium">{registration.teamName}</TableCell>
+                  <TableCell>
+                    <div className="space-y-1 max-h-[150px] overflow-y-auto">
+                      {registration.teamMembers.map((member, index) => (
+                        <div key={index} className="text-sm">
+                          <div className="font-medium">{member.name}</div>
+                          <div className="text-muted-foreground text-xs">
+                            {member.email} • {member.department} {member.roll_number && `• ${member.roll_number}`}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {formatDate(registration.registrationDate)}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={`h-8 w-8 ${registration.attended ? 'bg-green-100 text-green-700' : 'text-muted-foreground'}`}
+                      onClick={() => handleAttendanceToggle(registration)}
+                    >
+                      {registration.attended ? <CheckIcon className="h-4 w-4" /> : <Checkbox className="h-4 w-4" />}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       ) : (
         <div className="border rounded-md py-8 text-center text-muted-foreground">
           No registrations for this event yet.
