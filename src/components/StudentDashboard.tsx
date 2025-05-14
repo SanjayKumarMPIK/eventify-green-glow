@@ -230,14 +230,14 @@ export function StudentDashboard() {
             </p>
           </div>
           
-          <div style="display: flex; justify-content: space-between; margin-top: 70px;">
+          <div style="display: flex; justify-content: space-between; margin-top: 50px;">
             <div>
-              <div style="border-top: 1px solid #000; width: 200px; padding-top: 10px; display: inline-block;">
+              <div style="border-top: 1px solid #000; width: 200px; padding-top: 5px; display: inline-block;">
                 <p style="margin: 0;">Event Coordinator</p>
               </div>
             </div>
             <div>
-              <div style="border-top: 1px solid #000; width: 200px; padding-top: 10px; display: inline-block;">
+              <div style="border-top: 1px solid #000; width: 200px; padding-top: 5px; display: inline-block;">
                 <p style="margin: 0;">Department Head</p>
               </div>
             </div>
