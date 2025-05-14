@@ -213,14 +213,14 @@ export function StudentDashboard() {
     return `
       <div style="font-family: 'Arial', sans-serif; text-align: center; padding: 40px; color: #333; border: 20px double #4f46e5; background-color: #f9fafb; max-width: 800px; margin: 0 auto;">
         <div style="max-width: 800px; margin: 0 auto;">
-          <h1 style="color: #4f46e5; font-size: 36px; margin-bottom: 30px;">Certificate of Participation</h1>
+          <h1 style="color: #4f46e5; font-size: 36px; margin-bottom: 15px;">Certificate of Participation</h1>
           
           <div style="margin: 45px 0;">
-            <p style="font-size: 18px; margin-bottom: 8px;">This is to certify that</p>
-            <p style="font-size: 28px; font-weight: bold; margin: 16px 0;">${username}</p>
-            <p style="font-size: 18px; margin-bottom: 15px;">from ${department}</p>
+            <p style="font-size: 18px; margin-bottom: 5px;">This is to certify that</p>
+            <p style="font-size: 28px; font-weight: bold; margin: 12px 0;">${username}</p>
+            <p style="font-size: 18px; margin-bottom: 10px;">from ${department}</p>
             <p style="font-size: 18px; margin-bottom: 10px;">has actively participated in</p>
-            <p style="font-size: 28px; font-weight: bold; margin: 16px 0;">${event.title}</p>
+            <p style="font-size: 28px; font-weight: bold; margin: 12px 0;">${event.title}</p>
             <p style="font-size: 18px; margin-bottom: 10px;">organized by Eventify on</p>
             <p style="font-size: 20px; margin: 16px 0;">${formatDate(event.date)}</p>
             <p style="font-size: 18px; line-height: 1.5; margin: 30px 0;">
@@ -230,7 +230,7 @@ export function StudentDashboard() {
             </p>
           </div>
           
-          <div style="display: flex; justify-content: space-between; margin-top: 80px;">
+          <div style="display: flex; justify-content: space-between; margin-top: 70px;">
             <div>
               <div style="border-top: 1px solid #000; width: 200px; padding-top: 10px; display: inline-block;">
                 <p style="margin: 0;">Event Coordinator</p>
