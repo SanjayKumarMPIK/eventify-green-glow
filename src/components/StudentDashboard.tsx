@@ -213,7 +213,7 @@ export function StudentDashboard() {
     return `
       <div style="font-family: 'Arial', sans-serif; text-align: center; padding: 40px; color: #333; border: 20px double #4f46e5; background-color: #f9fafb; max-width: 800px; margin: 0 auto;">
         <div style="max-width: 800px; margin: 0 auto;">
-          <h1 style="color: #4f46e5; font-size: 36px; margin-bottom: 15px;">Certificate of Participation</h1>
+          <h1 style="color: #4f46e5; font-size: 36px; margin-bottom: 10px;">Certificate of Participation</h1>
           
           <div style="margin: 45px 0;">
             <p style="font-size: 18px; margin-bottom: 5px;">This is to certify that</p>
@@ -223,7 +223,7 @@ export function StudentDashboard() {
             <p style="font-size: 28px; font-weight: bold; margin: 12px 0;">${event.title}</p>
             <p style="font-size: 18px; margin-bottom: 10px;">organized by Eventify on</p>
             <p style="font-size: 20px; margin: 16px 0;">${formatDate(event.date)}</p>
-            <p style="font-size: 18px; line-height: 1.5; margin: 30px 0;">
+            <p style="font-size: 18px; line-height: 1.0; margin: 20px 0;">
               We acknowledge their valuable contribution and enthusiasm throughout the event.
               This participation demonstrates their commitment to professional development and
               enhances their academic portfolio with practical experience.
