@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { FileText, Eye } from "lucide-react";
 import { Event, Registration } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/use-toast";
 import { useAuth } from "@/context/AuthContext";
 import { jsPDF } from "jspdf";
 import html2pdf from "html2pdf.js";
@@ -77,7 +77,11 @@ export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProp
 
   const handleGenerateOD = async () => {
     if (!user) {
-      toast.error("You must be logged in to download OD Letter");
+      toast({
+        title: "Authentication Error",
+        description: "You must be logged in to download OD Letter",
+        variant: "destructive"
+      });
       return;
     }
     
@@ -152,11 +156,18 @@ export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProp
       // Clean up the blob URL
       setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
       
-      toast.success("OD Letter downloaded successfully");
+      toast({
+        title: "Success",
+        description: "OD Letter downloaded successfully"
+      });
       setIsOpen(false);
     } catch (error) {
       console.error("Error generating OD letter:", error);
-      toast.error("Failed to generate OD letter. Please try again later.");
+      toast({
+        title: "Error",
+        description: "Failed to generate OD letter. Please try again later.",
+        variant: "destructive"
+      });
     } finally {
       setIsGenerating(false);
     }

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
@@ -7,7 +6,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { ChatBubbleIcon } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 
 interface FeedbackFormProps {
@@ -142,7 +141,7 @@ export function FeedbackForm({ eventId, userId }: FeedbackFormProps) {
         className="w-full flex items-center justify-center"
         onClick={() => setIsOpen(true)}
       >
-        <ChatBubbleIcon className="mr-2 h-4 w-4" />
+        <MessageSquare className="mr-2 h-4 w-4" />
         {hasFeedback ? "View/Edit Feedback" : "Submit Feedback"}
       </Button>
       
