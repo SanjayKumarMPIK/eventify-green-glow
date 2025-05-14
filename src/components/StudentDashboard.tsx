@@ -215,15 +215,15 @@ export function StudentDashboard() {
         <div style="max-width: 800px; margin: 0 auto;">
           <h1 style="color: #4f46e5; font-size: 36px; margin-bottom: 30px;">Certificate of Participation</h1>
           
-          <div style="margin: 50px 0;">
-            <p style="font-size: 18px; margin-bottom: 10px;">This is to certify that</p>
-            <p style="font-size: 28px; font-weight: bold; margin: 20px 0;">${username}</p>
-            <p style="font-size: 18px; margin-bottom: 20px;">from ${department}</p>
+          <div style="margin: 45px 0;">
+            <p style="font-size: 18px; margin-bottom: 8px;">This is to certify that</p>
+            <p style="font-size: 28px; font-weight: bold; margin: 16px 0;">${username}</p>
+            <p style="font-size: 18px; margin-bottom: 15px;">from ${department}</p>
             <p style="font-size: 18px; margin-bottom: 10px;">has actively participated in</p>
-            <p style="font-size: 28px; font-weight: bold; margin: 20px 0;">${event.title}</p>
+            <p style="font-size: 28px; font-weight: bold; margin: 16px 0;">${event.title}</p>
             <p style="font-size: 18px; margin-bottom: 10px;">organized by Eventify on</p>
-            <p style="font-size: 20px; margin: 20px 0;">${formatDate(event.date)}</p>
-            <p style="font-size: 18px; line-height: 1.6; margin: 30px 0;">
+            <p style="font-size: 20px; margin: 16px 0;">${formatDate(event.date)}</p>
+            <p style="font-size: 18px; line-height: 1.5; margin: 30px 0;">
               We acknowledge their valuable contribution and enthusiasm throughout the event.
               This participation demonstrates their commitment to professional development and
               enhances their academic portfolio with practical experience.
