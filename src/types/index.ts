@@ -40,3 +40,13 @@ export interface Event {
   registrations: Registration[];
   imageUrl?: string;
 }
+
+export interface Feedback {
+  id: string;
+  eventId: string;
+  userId: string;
+  overallRating: number;
+  wasInformative: boolean;
+  organizationRating: string;
+  additionalComments?: string;
+}

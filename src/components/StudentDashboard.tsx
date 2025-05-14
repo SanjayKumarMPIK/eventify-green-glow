@@ -9,6 +9,8 @@ import { FileIcon, Download } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
+import html2pdf from "html2pdf.js";
+import { FeedbackForm } from "./FeedbackForm";
 
 export function StudentDashboard() {
   const [myRegistrations, setMyRegistrations] = useState<Registration[]>([]);
@@ -205,6 +207,46 @@ export function StudentDashboard() {
     setShowCertificate(registration);
   };
 
+  const generateCertificateHTML = (event: Event | undefined, username: string, department: string) => {
+    if (!event) return '';
+    
+    return `
+      <div style="font-family: 'Arial', sans-serif; text-align: center; padding: 40px; color: #333; border: 20px double #4f46e5; background-color: #f9fafb; max-width: 800px; margin: 0 auto;">
+        <div style="max-width: 800px; margin: 0 auto;">
+          <h1 style="color: #4f46e5; font-size: 36px; margin-bottom: 30px;">Certificate of Participation</h1>
+          
+          <div style="margin: 50px 0;">
+            <p style="font-size: 18px; margin-bottom: 10px;">This is to certify that</p>
+            <p style="font-size: 28px; font-weight: bold; margin: 20px 0;">${username}</p>
+            <p style="font-size: 18px; margin-bottom: 20px;">from ${department}</p>
+            <p style="font-size: 18px; margin-bottom: 10px;">has actively participated in</p>
+            <p style="font-size: 28px; font-weight: bold; margin: 20px 0;">${event.title}</p>
+            <p style="font-size: 18px; margin-bottom: 10px;">organized by Eventify on</p>
+            <p style="font-size: 20px; margin: 20px 0;">${formatDate(event.date)}</p>
+            <p style="font-size: 18px; line-height: 1.6; margin: 30px 0;">
+              We acknowledge their valuable contribution and enthusiasm throughout the event.
+              This participation demonstrates their commitment to professional development and
+              enhances their academic portfolio with practical experience.
+            </p>
+          </div>
+          
+          <div style="display: flex; justify-content: space-between; margin-top: 80px;">
+            <div>
+              <div style="border-top: 1px solid #000; width: 200px; padding-top: 10px; display: inline-block;">
+                <p style="margin: 0;">Event Coordinator</p>
+              </div>
+            </div>
+            <div>
+              <div style="border-top: 1px solid #000; width: 200px; padding-top: 10px; display: inline-block;">
+                <p style="margin: 0;">Department Head</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  };
+
   const downloadCertificate = async () => {
     if (!showCertificate || !authUser || !currentUser) {
       toast.error("Missing required information");
@@ -220,101 +262,37 @@ export function StudentDashboard() {
         throw new Error("Event information not found");
       }
       
-      // Create PDF-like content using HTML with proper styling
-      const certificateHTML = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Certificate of Participation</title>
-        <style>
-          @page {
-            size: landscape;
-            margin: 0;
-          }
-          body {
-            font-family: 'Arial', sans-serif;
-            text-align: center;
-            color: #333;
-            padding: 40px;
-            border: 20px double #4f46e5;
-            margin: 0;
-            background-color: #f9fafb;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            min-height: 100vh;
-          }
-          .certificate {
-            max-width: 800px;
-            margin: 0 auto;
-          }
-          h1 {
-            color: #4f46e5;
-            font-size: 36px;
-            margin-bottom: 30px;
-          }
-          .name {
-            font-size: 32px;
-            font-weight: bold;
-            margin: 25px 0;
-            color: #000;
-          }
-          .event {
-            font-size: 28px;
-            font-weight: bold;
-            margin: 25px 0;
-            color: #333;
-          }
-          .signatures {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 100px;
-          }
-          .signature {
-            border-top: 1px solid #000;
-            width: 200px;
-            padding-top: 10px;
-            display: inline-block;
-          }
-          p {
-            font-size: 18px;
-            line-height: 1.6;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="certificate">
-          <h1>Certificate of Participation</h1>
-          <p>This is to certify that</p>
-          <p class="name">${currentUser.name}</p>
-          <p>from ${currentUser.department || 'Department'}</p>
-          <p>has successfully participated in the event</p>
-          <p class="event">${event.title}</p>
-          <p>held on ${formatDate(event.date)}</p>
-          
-          <div class="signatures">
-            <div>
-              <div class="signature">Event Coordinator</div>
-            </div>
-            <div>
-              <div class="signature">Department Head</div>
-            </div>
-          </div>
-        </div>
-      </body>
-      </html>
-      `;
+      // Generate certificate HTML
+      const certificateHTML = generateCertificateHTML(event, currentUser.name, currentUser.department || 'Department');
       
-      // Convert HTML to a Blob
-      const blob = new Blob([certificateHTML], { type: 'text/html' });
+      // Create a temporary container for the HTML content
+      const container = document.createElement('div');
+      container.innerHTML = certificateHTML;
+      document.body.appendChild(container);
       
-      // Create a file object
-      const fileName = `Certificate_${event.title}_${currentUser.name}.html`;
-      const file = new File([blob], fileName, { type: 'text/html' });
+      // File name for the certificate
+      const fileName = `Certificate_${event.title}_${currentUser.name}.pdf`;
+      
+      // Use html2pdf to convert HTML to PDF
+      const pdfBlob = await html2pdf()
+        .from(container)
+        .set({
+          margin: [15, 15, 15, 15],
+          filename: fileName,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+        })
+        .outputPdf('blob');
+      
+      // Remove the temporary container
+      document.body.removeChild(container);
+      
+      // Create a File object from the blob
+      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
       
       // Upload to Supabase storage
-      const filePath = `${authUser.id}/${showCertificate.id}_certificate.html`;
+      const filePath = `${authUser.id}/${showCertificate.id}_certificate.pdf`;
       const { data, error } = await supabase.storage
         .from('certificates')
         .upload(filePath, file, {
@@ -338,14 +316,11 @@ export function StudentDashboard() {
         throw updateError;
       }
       
-      // Download using a temporary link element
+      // Download the PDF
+      const blobUrl = URL.createObjectURL(pdfBlob);
       const downloadLink = document.createElement('a');
-      
-      // Generate a downloadable object URL from the blob directly
-      const blobUrl = URL.createObjectURL(blob);
       downloadLink.href = blobUrl;
       downloadLink.download = fileName;
-      downloadLink.target = "_blank";
       document.body.appendChild(downloadLink);
       downloadLink.click();
       document.body.removeChild(downloadLink);
@@ -362,8 +337,13 @@ export function StudentDashboard() {
       setIsGenerating(false);
     }
   };
-
   
+  // Check if event has passed to enable feedback
+  const hasEventPassed = (eventDate: Date) => {
+    const now = new Date();
+    return eventDate < now;
+  };
+
   return (
     <div className="space-y-6">
       <section className="space-y-3">
@@ -373,6 +353,9 @@ export function StudentDashboard() {
             {myRegistrations.map((registration) => {
               const event = getEventById(registration.eventId);
               if (!event) return null;
+              
+              const isPastEvent = hasEventPassed(event.date);
+              
               return (
                 <Card key={registration.id} className="overflow-hidden">
                   <CardHeader>
@@ -395,6 +378,10 @@ export function StudentDashboard() {
                         View Certificate
                       </Button>
                       <ODLetterGenerator registration={registration} event={event} />
+                      
+                      {isPastEvent && (
+                        <FeedbackForm eventId={event.id} userId={authUser?.id || ''} />
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -423,33 +410,17 @@ export function StudentDashboard() {
           </DialogHeader>
           {showCertificate && (
             <div className="py-4">
-              <div id="certificate-content" className="border-8 border-double border-primary/20 p-8 bg-[#F2FCE2]/30 text-center">
-                <h1 className="text-3xl font-bold text-primary mb-6">Certificate of Participation</h1>
-                <p className="text-lg mb-6">This is to certify that</p>
-                <p className="text-2xl font-semibold mb-2">{currentUser?.name}</p>
-                <p className="text-lg mb-6">from {currentUser?.department}</p>
-                <p className="text-lg mb-6">
-                  has successfully participated in the event
-                </p>
-                <p className="text-2xl font-semibold mb-6">
-                  {getEventById(showCertificate.eventId)?.title}
-                </p>
-                <p className="text-lg mb-10">
-                  held on {(() => {
-                    const eventDate = getEventById(showCertificate.eventId)?.date;
-                    return eventDate ? formatDate(eventDate) : '';
-                  })()}
-                </p>
-                <div className="flex justify-between pt-10">
-                  <div>
-                    <div className="border-t border-black w-40 mx-auto"></div>
-                    <p className="text-sm mt-1">Event Coordinator</p>
-                  </div>
-                  <div>
-                    <div className="border-t border-black w-40 mx-auto"></div>
-                    <p className="text-sm mt-1">Department Head</p>
-                  </div>
-                </div>
+              <div 
+                id="certificate-content" 
+                className="border-8 border-double border-primary/20 p-8 bg-[#F2FCE2]/30 text-center max-h-[60vh] overflow-y-auto"
+              >
+                <div dangerouslySetInnerHTML={{ 
+                  __html: generateCertificateHTML(
+                    getEventById(showCertificate.eventId),
+                    currentUser?.name || '',
+                    currentUser?.department || 'Department'
+                  ) 
+                }} />
               </div>
               <div className="flex justify-end mt-4">
                 <Button 

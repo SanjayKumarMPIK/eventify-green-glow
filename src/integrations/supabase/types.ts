@@ -51,6 +51,47 @@ export type Database = {
         }
         Relationships: []
       }
+      feedback: {
+        Row: {
+          additional_comments: string | null
+          created_at: string
+          event_id: string
+          id: string
+          organization_rating: string
+          overall_rating: number
+          user_id: string
+          was_informative: boolean
+        }
+        Insert: {
+          additional_comments?: string | null
+          created_at?: string
+          event_id: string
+          id?: string
+          organization_rating: string
+          overall_rating: number
+          user_id: string
+          was_informative: boolean
+        }
+        Update: {
+          additional_comments?: string | null
+          created_at?: string
+          event_id?: string
+          id?: string
+          organization_rating?: string
+          overall_rating?: number
+          user_id?: string
+          was_informative?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       registrations: {
         Row: {
           attended: boolean | null
@@ -156,7 +197,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      decrease_slot: {
+        Args: { event_id_input: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never

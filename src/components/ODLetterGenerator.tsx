@@ -7,6 +7,8 @@ import { Event, Registration } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useAuth } from "@/context/AuthContext";
+import { jsPDF } from "jspdf";
+import html2pdf from "html2pdf.js";
 
 interface ODLetterGeneratorProps {
   registration: Registration;
@@ -31,21 +33,45 @@ export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProp
   
   const generateODContent = () => {
     return `
-      Date: ${new Date().toLocaleDateString()}
-      
-      To Whom It May Concern,
-      
-      This is to certify that the following students from ${registration.teamMembers[0].department} department are participating in "${event.title}" event on ${formatDate(event.date)}.
-      
-      Team Name: ${registration.teamName}
-      Team Members:
-      ${registration.teamMembers.map((member, index) => `${index + 1}. ${member.name} (${member.email}, ${member.department})`).join('\n')}
-      
-      Please grant them On-Duty leave for the duration of the event.
-      
-      Regards,
-      Event Coordinator
-      Eventify Platform
+      <div style="font-family: 'Arial', sans-serif; padding: 40px; max-width: 800px; margin: 0 auto;">
+        <div style="text-align: right; margin-bottom: 30px;">
+          <p>Date: ${new Date().toLocaleDateString()}</p>
+        </div>
+        
+        <div style="margin-bottom: 30px;">
+          <p>To Whom It May Concern,</p>
+        </div>
+        
+        <div style="margin-bottom: 30px;">
+          <p>This is to certify that the following students from the ${registration.teamMembers[0].department} department are participating in the "${event.title}" event organized on ${formatDate(event.date)} at ${event.location}.</p>
+        </div>
+        
+        <div style="margin-bottom: 30px;">
+          <p><strong>Team Name:</strong> ${registration.teamName}</p>
+          <p><strong>Team Members:</strong></p>
+          <ul style="list-style-type: none; padding-left: 20px;">
+            ${registration.teamMembers.map((member, index) => `
+              <li style="margin-bottom: 5px;">
+                ${index + 1}. ${member.name} (${member.email}, ${member.department} ${member.roll_number ? `, Roll No: ${member.roll_number}` : ''})
+              </li>
+            `).join('')}
+          </ul>
+        </div>
+        
+        <div style="margin-bottom: 30px;">
+          <p>Please grant them On-Duty leave for the duration of the event. Their presence and participation is required for this educational activity which complements their academic curriculum.</p>
+        </div>
+        
+        <div style="margin-bottom: 40px;">
+          <p>Thank you for your understanding and cooperation.</p>
+        </div>
+        
+        <div style="margin-top: 60px;">
+          <p>Regards,</p>
+          <p>Event Coordinator</p>
+          <p>Eventify Platform</p>
+        </div>
+      </div>
     `;
   };
 
@@ -61,15 +87,34 @@ export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProp
       // Generate the OD letter content
       const odLetterContent = generateODContent();
       
-      // Create a Blob from the text content
-      const blob = new Blob([odLetterContent], { type: 'text/plain' });
+      // Create file name
+      const fileName = `OD_Letter_${event.title}_${registration.teamName}.pdf`;
       
-      // Create a file object
-      const fileName = `OD_Letter_${event.title}_${registration.teamName}.txt`;
-      const file = new File([blob], fileName, { type: 'text/plain' });
+      // Create a temporary container for the HTML content
+      const container = document.createElement('div');
+      container.innerHTML = odLetterContent;
+      document.body.appendChild(container);
+      
+      // Use html2pdf to convert HTML to PDF
+      const pdfBlob = await html2pdf()
+        .from(container)
+        .set({
+          margin: [15, 15, 15, 15],
+          filename: fileName,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { scale: 2, useCORS: true },
+          jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        })
+        .outputPdf('blob');
+      
+      // Remove the temporary container
+      document.body.removeChild(container);
+      
+      // Create a File object from the blob
+      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
       
       // Upload to Supabase storage with proper authorization
-      const filePath = `${user.id}/${registration.id}_od_letter.txt`;
+      const filePath = `${user.id}/${registration.id}_od_letter.pdf`;
       const { data, error } = await supabase.storage
         .from('od_letters')
         .upload(filePath, file, {
@@ -94,7 +139,7 @@ export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProp
       }
       
       // Create a direct download by creating a blob URL
-      const blobUrl = URL.createObjectURL(blob);
+      const blobUrl = URL.createObjectURL(pdfBlob);
       
       // Create a download link
       const downloadLink = document.createElement('a');
@@ -129,8 +174,8 @@ export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProp
           <DialogHeader>
             <DialogTitle>On-Duty Letter</DialogTitle>
           </DialogHeader>
-          <div className="p-4 border rounded-md bg-white text-sm whitespace-pre-line font-mono">
-            {generateODContent()}
+          <div className="p-4 border rounded-md bg-white text-sm whitespace-pre-line font-mono max-h-[60vh] overflow-y-auto">
+            <div dangerouslySetInnerHTML={{ __html: generateODContent() }} />
           </div>
           <div className="flex justify-end gap-2 mt-4">
             <Button variant="outline" onClick={() => setIsOpen(false)}>
@@ -142,7 +187,7 @@ export function ODLetterGenerator({ registration, event }: ODLetterGeneratorProp
               disabled={isGenerating}
             >
               <FileText className="mr-2 h-4 w-4" />
-              {isGenerating ? "Generating..." : "Download"}
+              {isGenerating ? "Generating..." : "Download PDF"}
             </Button>
           </div>
         </DialogContent>
