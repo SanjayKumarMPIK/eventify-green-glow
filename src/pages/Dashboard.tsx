@@ -8,12 +8,16 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Layout } from "@/components/Layout";
+import { UserAchievements } from "@/components/UserAchievements";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { motion } from "framer-motion";
 
 const Dashboard = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<UserRole>("student");
   const { user: authUser } = useAuth();
+  const [activeTab, setActiveTab] = useState<string>("dashboard");
   
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -113,7 +117,12 @@ const Dashboard = () => {
   return (
     <Layout>
       <div className="container py-8">
-        <div className="mb-6">
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="mb-6"
+        >
           <h1 className="text-3xl font-bold tracking-tight">
             {userRole === "admin" ? "Admin Dashboard" : "Student Dashboard"}
           </h1>
@@ -122,13 +131,26 @@ const Dashboard = () => {
               ? "Manage events and view registrations" 
               : "View your registered events and certificates"}
           </p>
-        </div>
+        </motion.div>
 
-        {userRole === "admin" ? (
-          <AdminDashboard />
-        ) : (
-          <StudentDashboard />
-        )}
+        <Tabs defaultValue="dashboard" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="mb-4">
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="achievements">Achievements</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="dashboard" className="space-y-6">
+            {userRole === "admin" ? (
+              <AdminDashboard />
+            ) : (
+              <StudentDashboard />
+            )}
+          </TabsContent>
+          
+          <TabsContent value="achievements">
+            <UserAchievements />
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );
