@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,7 +6,7 @@ import { ODLetterGenerator } from "./ODLetterGenerator";
 import { Event, Registration, User, UserRole, TeamMember } from "@/types";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { FileIcon, Download } from "lucide-react";
+import { FileIcon, Download, LockIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
@@ -204,6 +205,12 @@ export function StudentDashboard() {
   };
 
   const generateCertificate = (registration: Registration) => {
+    // Check if attendance is marked
+    if (!registration.attended) {
+      toast.error("Certificate is locked until your attendance is marked by an admin");
+      return;
+    }
+    
     setShowCertificate(registration);
   };
 
@@ -355,6 +362,7 @@ export function StudentDashboard() {
               if (!event) return null;
               
               const isPastEvent = hasEventPassed(event.date);
+              const isAttendanceMarked = registration.attended === true;
               
               return (
                 <Card key={registration.id} className="overflow-hidden">
@@ -370,12 +378,16 @@ export function StudentDashboard() {
                     </p>
                     <div className="flex flex-col space-y-2">
                       <Button 
-                        variant="outline" 
-                        className="w-full flex items-center justify-center"
+                        variant={isAttendanceMarked ? "outline" : "secondary"}
+                        className={`w-full flex items-center justify-center ${!isAttendanceMarked ? "opacity-60" : ""}`}
                         onClick={() => generateCertificate(registration)}
                       >
-                        <FileIcon className="mr-2 h-4 w-4" />
-                        View Certificate
+                        {isAttendanceMarked ? (
+                          <FileIcon className="mr-2 h-4 w-4" />
+                        ) : (
+                          <LockIcon className="mr-2 h-4 w-4" />
+                        )}
+                        {isAttendanceMarked ? "View Certificate" : "Certificate Locked"}
                       </Button>
                       <ODLetterGenerator registration={registration} event={event} />
                       
