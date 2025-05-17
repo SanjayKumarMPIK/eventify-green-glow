@@ -82,7 +82,7 @@ export function RegistrationsView({ event }: RegistrationsViewProps) {
           userId: reg.user_id,
           teamName: reg.team_name,
           registrationDate: new Date(reg.registration_date),
-          attended: reg.attended,
+          attended: reg.attended || false, // Ensure it's a boolean even if null
           certificate_generated: reg.certificate_generated,
           od_letter_generated: reg.od_letter_generated,
           teamMembers: teamMembersByRegistration[reg.id] || []

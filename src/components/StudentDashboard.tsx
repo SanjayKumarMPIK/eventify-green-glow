@@ -70,6 +70,8 @@ export function StudentDashboard() {
           return;
         }
         
+        console.log("Raw registration data:", registrationData);
+        
         // Fetch event details for each registration
         const eventIds = registrationData.map(reg => reg.event_id);
         
@@ -135,17 +137,22 @@ export function StudentDashboard() {
         }, {} as Record<string, TeamMember[]>);
         
         // Construct registrations with event and team member data
-        const processedRegistrations = registrationData.map(reg => ({
-          id: reg.id,
-          eventId: reg.event_id,
-          userId: reg.user_id,
-          teamName: reg.team_name,
-          registrationDate: new Date(reg.registration_date),
-          attended: reg.attended,
-          certificate_generated: reg.certificate_generated,
-          od_letter_generated: reg.od_letter_generated,
-          teamMembers: teamMembersByRegistration[reg.id] || []
-        }));
+        const processedRegistrations = registrationData.map(reg => {
+          console.log(`Processing registration ${reg.id}, attended status: ${reg.attended}`);
+          return {
+            id: reg.id,
+            eventId: reg.event_id,
+            userId: reg.user_id,
+            teamName: reg.team_name,
+            registrationDate: new Date(reg.registration_date),
+            attended: reg.attended === true, // Explicitly convert to boolean
+            certificate_generated: reg.certificate_generated === true,
+            od_letter_generated: reg.od_letter_generated === true,
+            teamMembers: teamMembersByRegistration[reg.id] || []
+          };
+        });
+        
+        console.log("Processed registrations:", processedRegistrations);
         
         setMyRegistrations(processedRegistrations);
         setEvents(Object.values(eventsMap));
@@ -175,10 +182,40 @@ export function StudentDashboard() {
             }
           )
           .subscribe();
+          
+        // Set up real-time listener for registration updates (attendance marking)
+        const registrationChannel = supabase
+          .channel('registration-updates')
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'registrations',
+              filter: `user_id=eq.${authUser.id}`
+            },
+            (payload) => {
+              console.log('Registration update received:', payload);
+              const updatedRegistration = payload.new;
+              
+              setMyRegistrations(prevRegistrations => prevRegistrations.map(reg => 
+                reg.id === updatedRegistration.id ? 
+                {
+                  ...reg,
+                  attended: updatedRegistration.attended === true,
+                  certificate_generated: updatedRegistration.certificate_generated === true,
+                  od_letter_generated: updatedRegistration.od_letter_generated === true,
+                } : 
+                reg
+              ));
+            }
+          )
+          .subscribe();
         
-        // Return cleanup function for the channel
+        // Return cleanup function for the channels
         return () => {
           supabase.removeChannel(eventChannel);
+          supabase.removeChannel(registrationChannel);
         };
       } catch (error) {
         console.error("Unexpected error:", error);
@@ -363,6 +400,8 @@ export function StudentDashboard() {
               
               const isPastEvent = hasEventPassed(event.date);
               const isAttendanceMarked = registration.attended === true;
+              
+              console.log(`Rendering registration ${registration.id}, attended: ${registration.attended}, isAttendanceMarked: ${isAttendanceMarked}`);
               
               return (
                 <Card key={registration.id} className="overflow-hidden">
