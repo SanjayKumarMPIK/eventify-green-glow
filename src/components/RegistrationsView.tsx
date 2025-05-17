@@ -76,17 +76,22 @@ export function RegistrationsView({ event }: RegistrationsViewProps) {
         }, {} as Record<string, TeamMember[]>);
         
         // Construct registrations with team member data
-        const processedRegistrations = registrationData.map(reg => ({
-          id: reg.id,
-          eventId: event.id,
-          userId: reg.user_id,
-          teamName: reg.team_name,
-          registrationDate: new Date(reg.registration_date),
-          attended: reg.attended || false, // Ensure it's a boolean even if null
-          certificate_generated: reg.certificate_generated,
-          od_letter_generated: reg.od_letter_generated,
-          teamMembers: teamMembersByRegistration[reg.id] || []
-        }));
+        const processedRegistrations = registrationData.map(reg => {
+          console.log(`Loading registration ${reg.id}, raw attended status:`, reg.attended);
+          return {
+            id: reg.id,
+            eventId: event.id,
+            userId: reg.user_id,
+            teamName: reg.team_name,
+            registrationDate: new Date(reg.registration_date),
+            attended: reg.attended === true, // Explicit boolean conversion
+            certificate_generated: reg.certificate_generated === true,
+            od_letter_generated: reg.od_letter_generated === true,
+            teamMembers: teamMembersByRegistration[reg.id] || []
+          };
+        });
+        
+        console.log("Processed registrations:", processedRegistrations);
         
         setRegistrations(processedRegistrations);
         setFilteredRegistrations(processedRegistrations);
@@ -99,6 +104,53 @@ export function RegistrationsView({ event }: RegistrationsViewProps) {
     };
     
     fetchRegistrations();
+    
+    // Set up real-time listener for attendance updates
+    const channel = supabase
+      .channel('registration-attendance-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'registrations',
+          filter: `event_id=eq.${event.id}`
+        },
+        (payload) => {
+          console.log('Registration update received in admin view:', payload);
+          const updatedRegistration = payload.new;
+          
+          // Update local state with the changes from the database
+          setRegistrations(prevRegistrations => prevRegistrations.map(reg => 
+            reg.id === updatedRegistration.id ? 
+            {
+              ...reg,
+              attended: updatedRegistration.attended === true,
+              certificate_generated: updatedRegistration.certificate_generated === true,
+              od_letter_generated: updatedRegistration.od_letter_generated === true,
+            } : 
+            reg
+          ));
+          
+          // Also update filtered registrations
+          setFilteredRegistrations(prevFiltered => prevFiltered.map(reg => 
+            reg.id === updatedRegistration.id ? 
+            {
+              ...reg,
+              attended: updatedRegistration.attended === true,
+              certificate_generated: updatedRegistration.certificate_generated === true,
+              od_letter_generated: updatedRegistration.od_letter_generated === true,
+            } : 
+            reg
+          ));
+        }
+      )
+      .subscribe();
+    
+    // Return cleanup function
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [event.id]);
 
   useEffect(() => {
@@ -123,19 +175,27 @@ export function RegistrationsView({ event }: RegistrationsViewProps) {
 
   const handleAttendanceToggle = async (registration: Registration) => {
     try {
-      const newStatus = !registration.attended;
+      const currentStatus = registration.attended === true;
+      const newStatus = !currentStatus;
+      
+      console.log(`Toggling attendance for ${registration.id} from ${currentStatus} to ${newStatus}`);
       
       // Update the attendance status in the database
-      const { error } = await supabase
+      // Use explicit boolean for the update to avoid any type issues
+      const { data, error } = await supabase
         .from('registrations')
         .update({ attended: newStatus })
-        .eq('id', registration.id);
+        .eq('id', registration.id)
+        .select();
         
       if (error) {
+        console.error("Supabase update error:", error);
         throw error;
       }
       
-      // Update local state
+      console.log("Update response from Supabase:", data);
+      
+      // Update local state (should also happen via real-time subscription)
       setRegistrations(prevRegistrations => 
         prevRegistrations.map(reg => 
           reg.id === registration.id ? { ...reg, attended: newStatus } : reg
